@@ -292,6 +292,30 @@ QThemeIconEntries QIconLoader::findIconHelper(const QString &themeName,
                 break;
         }
     }
+
+#ifdef Q_OS_LINUX
+    /* Freedesktop standard says to look in /usr/share/pixmaps last */
+    if (entries.isEmpty()) {
+        const QString pixmaps(QLatin1String("/usr/share/pixmaps"));
+
+        QDir currentDir(pixmaps);
+        if (currentDir.exists(iconName + pngext)) {
+            PixmapEntry *iconEntry = new PixmapEntry;
+            iconEntry->dir = pixmaps;
+            iconEntry->filename = currentDir.filePath(iconName + pngext);
+            // Notice we ensure that pixmap entries allways come before
+            // scalable to preserve search order afterwards
+            entries.prepend(iconEntry);
+        } else if (m_supportsSvg &&
+            currentDir.exists(iconName + svgext)) {
+            ScalableEntry *iconEntry = new ScalableEntry;
+            iconEntry->dir = pixmaps;
+            iconEntry->filename = currentDir.filePath(iconName + svgext);
+            entries.append(iconEntry);
+        }
+    }
+#endif
+
     return entries;
 }
 
