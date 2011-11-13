@@ -688,6 +688,11 @@ public:
 
     inline QRect mapFromWS(const QRect &r) const
     { QRect rr(r); rr.translate(data.wrect.topLeft()); return rr; }
+
+#endif
+
+#if !defined(Q_WS_QWS) && !defined(Q_WS_X11)
+    void registerTouchWindow();
 #endif
 
     // Variables.
@@ -787,6 +792,7 @@ public:
     void x11UpdateIsOpaque();
     bool isBackgroundInherited() const;
     void updateX11AcceptFocus();
+    void grabMouse_sys(Qt::HANDLE xcursorid);
     QPoint mapToGlobal(const QPoint &pos) const;
     QPoint mapFromGlobal(const QPoint &pos) const;
 #elif defined(Q_WS_WIN) // <--------------------------------------------------------- WIN
@@ -797,12 +803,13 @@ public:
     bool shouldShowMaximizeButton();
     void winUpdateIsOpaque();
     void reparentChildren();
+    void registerTouchWindow();
+
 #ifndef QT_NO_DRAGANDDROP
     QOleDropTarget *registerOleDnd(QWidget *widget);
     void unregisterOleDnd(QWidget *widget, QOleDropTarget *target);
 #endif
     void grabMouseWhileInWindow();
-    void registerTouchWindow();
     void winSetupGestures();
 #elif defined(Q_WS_MAC) // <--------------------------------------------------------- MAC
     // This is new stuff

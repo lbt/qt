@@ -98,13 +98,14 @@
 #  include <X11/extensions/shape.h>
 #endif // QT_NO_SHAPE
 
-
-#if !defined (QT_NO_TABLET)
+#if !defined(QT_NO_XINPUT2)
+#  include <X11/extensions/XInput2.h>
+#elif !defined (QT_NO_TABLET)
 #  include <X11/extensions/XInput.h>
-#if defined (Q_OS_IRIX)
-#  include <X11/extensions/SGIMisc.h>
-#  include <wacom.h>
-#endif
+#  if defined (Q_OS_IRIX)
+#    include <X11/extensions/SGIMisc.h>
+#    include <wacom.h>
+#  endif
 #endif // QT_NO_TABLET
 
 
@@ -424,23 +425,33 @@ struct QX11Data
     PtrXFixesSelectSelectionInput ptrXFixesSelectSelectionInput;
 #endif
 
-#ifndef QT_NO_XINPUT
+#if !defined(QT_NO_XINPUT2)
+    XIDeviceInfo *xiDeviceInfo;            // device info for all connected devices
+    int xiDeviceCount;
+    int xiMasterIndex;                     // Index in xiDeviceInfo of the Master core pointer device
+    int xiMasterDeviceId;                  // Device Id of the Master core pointer
+    XIButtonClassInfo *xibuttonclassinfo;  // button class information for the Master pointer
+    // Touch devices can be slaves or floating; they are not necessarily bound to a core pointer
+    // So we create a list of all of the 'active' devices to listen to and grab.  This list
+    // will contain any device that supports the TrackingID and the Master Core Pointer
+    QList<int> xiActiveDevices;
+    QList<bool> xiIsTouch;
+#elif !defined(QT_NO_XINPUT)
     PtrXCloseDevice ptrXCloseDevice;
     PtrXListInputDevices ptrXListInputDevices;
     PtrXOpenDevice ptrXOpenDevice;
     PtrXFreeDeviceList ptrXFreeDeviceList;
     PtrXSelectExtensionEvent ptrXSelectExtensionEvent;
-#endif // QT_NO_XINPUT
-
+#endif
 
     // true if Qt is compiled w/ MIT-SHM support and MIT-SHM is supported on the connected Display
     bool use_mitshm;
     bool use_mitshm_pixmaps;
     int mitshm_major;
 
-    // true if Qt is compiled w/ Tablet support and we have a tablet.
+    // true if Qt is compiled w/ XInput2 or Tablet support and we have a tablet.
     bool use_xinput;
-    int xinput_major;
+    int xinput_opcode;
     int xinput_eventbase;
     int xinput_errorbase;
 
@@ -688,6 +699,22 @@ struct QX11Data
 
         XTabletStylus,
         XTabletEraser,
+
+        // XInput2
+        ButtonLeft,
+        ButtonMiddle,
+        ButtonRight,
+        ButtonWheelUp,
+        ButtonWheelDown,
+        ButtonHorizWheelLeft,
+        ButtonHorizWheelRight,
+        AbsMTPositionX,
+        AbsMTPositionY,
+        AbsMTTouchMajor,
+        AbsMTTouchMinor,
+        AbsMTPressure,
+        AbsMTTrackingID,
+        MaxContacts,
 
         NPredefinedAtoms,
 

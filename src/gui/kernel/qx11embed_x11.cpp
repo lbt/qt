@@ -1539,13 +1539,24 @@ bool QX11EmbedContainer::x11Event(XEvent *event)
     case XButtonPress:
 	if (!d->clientIsXEmbed) {
             setFocus(Qt::MouseFocusReason);
-            XAllowEvents(x11Info().display(), ReplayPointer, CurrentTime);
+#if !defined(QT_NO_XINPUT2)
+            if (X11->use_xinput)
+                XIAllowEvents(x11Info().display(), X11->xiMasterDeviceId, ReplayPointer, CurrentTime);
+            else
+#endif
+                XAllowEvents(x11Info().display(), ReplayPointer, CurrentTime);
             return true;
 	}
 	break;
     case XButtonRelease:
-	if (!d->clientIsXEmbed)
-            XAllowEvents(x11Info().display(), SyncPointer, CurrentTime);
+        if (!d->clientIsXEmbed) {
+#if !defined(QT_NO_XINPUT2)
+            if (X11->use_xinput)
+                XIAllowEvents(x11Info().display(), X11->xiMasterDeviceId, SyncPointer, CurrentTime);
+            else
+#endif
+                XAllowEvents(x11Info().display(), SyncPointer, CurrentTime);
+        }
 	break;
     default:
 	break;
@@ -1778,14 +1789,41 @@ void QX11EmbedContainerPrivate::checkGrab()
     Q_Q(QX11EmbedContainer);
     if (!clientIsXEmbed && q->isActiveWindow() && !q->hasFocus()) {
         if (!xgrab) {
-            XGrabButton(q->x11Info().display(), AnyButton, AnyModifier, q->internalWinId(),
-                        true, ButtonPressMask, GrabModeSync, GrabModeAsync,
-                        None, None);
+#if !defined(QT_NO_XINPUT2)
+            if (X11->use_xinput) {
+                XIEventMask xieventmask;
+                uchar bitmask[1] = { 0 };
+                xieventmask.deviceid = X11->xiMasterDeviceId;
+                xieventmask.mask = bitmask;
+                xieventmask.mask_len = sizeof(bitmask);
+                XISetMask(bitmask, XI_ButtonPress);
+
+                XIGrabModifiers anymods;
+                anymods.modifiers = XIAnyModifier;
+
+                XIGrabButton(q->x11Info().display(), X11->xiMasterDeviceId, XIAnyButton, q->internalWinId(), XNone, GrabModeSync, GrabModeAsync, true, &xieventmask, 1, &anymods);
+            } else
+#endif
+            {
+                XGrabButton(q->x11Info().display(), AnyButton, AnyModifier, q->internalWinId(),
+                            true, ButtonPressMask, GrabModeSync, GrabModeAsync,
+                            None, None);
+            }
         }
         xgrab = true;
     } else {
-	if (xgrab)
-	    XUngrabButton(q->x11Info().display(), AnyButton, AnyModifier, q->internalWinId());
+        if (xgrab) {
+#if !defined(QT_NO_XINPUT2)
+            if (X11->use_xinput) {
+                XIGrabModifiers anymods;
+                anymods.modifiers = XIAnyModifier;
+                XIUngrabButton(q->x11Info().display(), X11->xiMasterDeviceId, AnyButton, q->internalWinId(), 1, &anymods);
+            } else
+#endif
+            {
+                XUngrabButton(q->x11Info().display(), AnyButton, AnyModifier, q->internalWinId());
+            }
+        }
         xgrab = false;
     }
 }

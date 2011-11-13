@@ -152,16 +152,42 @@ Qt::HANDLE QCursor::handle() const
 
 QPoint QCursor::pos()
 {
-    Window root;
-    Window child;
-    int root_x, root_y, win_x, win_y;
-    uint buttons;
-    Display* dpy = X11->display;
-    for (int i = 0; i < ScreenCount(dpy); ++i) {
-        if (XQueryPointer(dpy, QX11Info::appRootWindow(i), &root, &child, &root_x, &root_y,
-                          &win_x, &win_y, &buttons))
+#if !defined(QT_NO_XINPUT2)
+    if (X11->use_xinput) {
+        Window root;
+        Window child;
+        double root_x, root_y, win_x, win_y;
+        XIButtonState buttons;
+        XIModifierState modifiers;
+        XIGroupState groups;
+        for (int i = 0; i < ScreenCount(X11->display); ++i) {
+            if (XIQueryPointer(X11->display,
+                               X11->xiMasterDeviceId,
+                               QX11Info::appRootWindow(i),
+                               &root,
+                               &child,
+                               &root_x, &root_y,
+                               &win_x, &win_y,
+                               &buttons,
+                               &modifiers,
+                               &groups)) {
+                free(buttons.mask);
+                return QPoint(root_x, root_y);
+            }
+        }
+    } else
+#endif
+    {
+        Window root;
+        Window child;
+        int root_x, root_y, win_x, win_y;
+        uint buttons;
+        for (int i = 0; i < ScreenCount(X11->display); ++i) {
+            if (XQueryPointer(X11->display, QX11Info::appRootWindow(i), &root, &child, &root_x, &root_y,
+                              &win_x, &win_y, &buttons))
 
-            return QPoint(root_x, root_y);
+                return QPoint(root_x, root_y);
+        }
     }
     return QPoint();
 }
@@ -171,15 +197,41 @@ QPoint QCursor::pos()
 #ifndef QT_NO_CURSOR
 int QCursor::x11Screen()
 {
-    Window root;
-    Window child;
-    int root_x, root_y, win_x, win_y;
-    uint buttons;
-    Display* dpy = X11->display;
-    for (int i = 0; i < ScreenCount(dpy); ++i) {
-        if (XQueryPointer(dpy, QX11Info::appRootWindow(i), &root, &child, &root_x, &root_y,
-                          &win_x, &win_y, &buttons))
-            return i;
+#if !defined(QT_NO_XINPUT2)
+    if (X11->use_xinput) {
+        Window root;
+        Window child;
+        double root_x, root_y, win_x, win_y;
+        XIButtonState buttons;
+        XIModifierState modifiers;
+        XIGroupState groups;
+        for (int i = 0; i < ScreenCount(X11->display); ++i) {
+            if (XIQueryPointer(X11->display,
+                               X11->xiMasterDeviceId,
+                               QX11Info::appRootWindow(i),
+                               &root,
+                               &child,
+                               &root_x, &root_y,
+                               &win_x, &win_y,
+                               &buttons,
+                               &modifiers,
+                               &groups)) {
+                free(buttons.mask);
+                return i;
+            }
+        }
+    } else
+#endif
+    {
+        Window root;
+        Window child;
+        int root_x, root_y, win_x, win_y;
+        uint buttons;
+        for (int i = 0; i < ScreenCount(X11->display); ++i) {
+            if (XQueryPointer(X11->display, QX11Info::appRootWindow(i), &root, &child, &root_x, &root_y,
+                              &win_x, &win_y, &buttons))
+                return i;
+        }
     }
     return -1;
 }
@@ -191,21 +243,47 @@ void QCursor::setPos(int x, int y)
 
     // this is copied from pos(), since we need the screen number for the correct
     // root window in the XWarpPointer call
-    Window root;
-    Window child;
-    int root_x, root_y, win_x, win_y;
-    uint buttons;
-    Display* dpy = X11->display;
     int screen;
-    for (screen = 0; screen < ScreenCount(dpy); ++screen) {
-        if (XQueryPointer(dpy, QX11Info::appRootWindow(screen), &root, &child, &root_x, &root_y,
-                          &win_x, &win_y, &buttons)) {
-            current = QPoint(root_x, root_y);
-            break;
+#if !defined(QT_NO_XINPUT2)
+    if (X11->use_xinput) {
+        Window root;
+        Window child;
+        double root_x, root_y, win_x, win_y;
+        XIButtonState buttons;
+        XIModifierState modifiers;
+        XIGroupState groups;
+        for (screen = 0; screen < ScreenCount(X11->display); ++screen) {
+            if (XIQueryPointer(X11->display,
+                               X11->xiMasterDeviceId,
+                               QX11Info::appRootWindow(screen),
+                               &root,
+                               &child,
+                               &root_x, &root_y,
+                               &win_x, &win_y,
+                               &buttons,
+                               &modifiers,
+                               &groups)) {
+                current = QPoint(root_x, root_y);
+                break;
+            }
+        }
+    } else
+#endif
+    {
+        Window root;
+        Window child;
+        int root_x, root_y, win_x, win_y;
+        uint buttons;
+        for (screen = 0; screen < ScreenCount(X11->display); ++screen) {
+            if (XQueryPointer(X11->display, QX11Info::appRootWindow(screen), &root, &child, &root_x, &root_y,
+                              &win_x, &win_y, &buttons)) {
+                current = QPoint(root_x, root_y);
+                break;
+            }
         }
     }
 
-    if (screen >= ScreenCount(dpy))
+    if (screen >= ScreenCount(X11->display))
         return;
 
     // Need to check, since some X servers generate null mouse move
@@ -215,7 +293,12 @@ void QCursor::setPos(int x, int y)
     if (current == target)
         return;
 
-    XWarpPointer(X11->display, XNone, QX11Info::appRootWindow(screen), 0, 0, 0, 0, x, y);
+#if !defined(QT_NO_XINPUT2)
+    if (X11->use_xinput)
+        XIWarpPointer(X11->display, X11->xiMasterDeviceId, XNone, QX11Info::appRootWindow(screen), 0, 0, 0, 0, x, y);
+    else
+#endif
+        XWarpPointer(X11->display, XNone, QX11Info::appRootWindow(screen), 0, 0, 0, 0, x, y);
 }
 
 

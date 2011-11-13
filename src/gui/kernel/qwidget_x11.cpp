@@ -327,18 +327,42 @@ void qt_x11_enforce_cursor(QWidget * w, bool force)
     if (w->isWindow() || w->testAttribute(Qt::WA_SetCursor)) {
 #ifndef QT_NO_CURSOR
         QCursor *oc = QApplication::overrideCursor();
-        if (oc) {
-            XDefineCursor(X11->display, winid, oc->handle());
-        } else if (w->isEnabled()) {
-            XDefineCursor(X11->display, winid, w->cursor().handle());
-        } else {
-            // enforce the windows behavior of clearing the cursor on
-            // disabled widgets
-            XDefineCursor(X11->display, winid, XNone);
+#  if !defined(QT_NO_XINPUT2)
+        if (X11->use_xinput) {
+            // duplicated below (more or less)
+            if (oc) {
+                XIDefineCursor(X11->display, X11->xiMasterDeviceId, winid, oc->handle());
+            } else if (w->isEnabled()) {
+                XIDefineCursor(X11->display, X11->xiMasterDeviceId, winid, w->cursor().handle());
+            } else {
+                // enforce the windows behavior of clearing the cursor on
+                // disabled widgets
+                XIDefineCursor(X11->display, X11->xiMasterDeviceId, winid, XNone);
+            }
+        } else
+#  endif
+        {
+            // duplicated above (more or less)
+            if (oc) {
+                XDefineCursor(X11->display, winid, oc->handle());
+            } else if (w->isEnabled()) {
+                XDefineCursor(X11->display, winid, w->cursor().handle());
+            } else {
+                // enforce the windows behavior of clearing the cursor on
+                // disabled widgets
+                XDefineCursor(X11->display, winid, XNone);
+            }
         }
 #endif
     } else {
-        XDefineCursor(X11->display, winid, XNone);
+#if !defined(QT_NO_XINPUT2)
+        if (X11->use_xinput) {
+            XIDefineCursor(X11->display, X11->xiMasterDeviceId, winid, XNone);
+        } else
+#endif
+        {
+            XDefineCursor(X11->display, winid, XNone);
+        }
     }
 }
 
@@ -869,7 +893,41 @@ void QWidgetPrivate::create_sys(WId window, bool initializeWindow, bool destroyO
 //         else
         XSelectInput(dpy, id, stdDesktopEventMask);
     } else if (q->internalWinId()) {
-        XSelectInput(dpy, id, stdWidgetEventMask);
+        uint eventmask = stdWidgetEventMask;
+
+#if !defined(QT_NO_XINPUT2)
+        if (X11->use_xinput) {
+            foreach (int deviceId, X11->xiActiveDevices) {
+                XIEventMask xieventmask;
+                uchar bitmask[2] = { 0, 0 };
+
+                xieventmask.deviceid = deviceId;
+                xieventmask.mask = bitmask;
+                xieventmask.mask_len = sizeof(bitmask);
+
+                XISetMask(bitmask, XI_ButtonPress);
+                XISetMask(bitmask, XI_ButtonRelease);
+                XISetMask(bitmask, XI_Motion);
+                if (deviceId == X11->xiMasterDeviceId) {
+                    XISetMask(bitmask, XI_Enter);
+                    XISetMask(bitmask, XI_Leave);
+                }
+
+                XISelectEvents(dpy, id, &xieventmask, 1);
+            }
+
+            // remove the corresponding core events from the standard event mask
+            eventmask &= ~(ButtonPressMask
+                           | ButtonReleaseMask
+                           | ButtonMotionMask
+                           | PointerMotionMask
+                           | EnterWindowMask
+                           | LeaveWindowMask);
+        }
+#endif
+
+        XSelectInput(dpy, id, eventmask);
+
 #if !defined (QT_NO_TABLET)
         QTabletDeviceDataList *tablet_list = qt_tablet_devices();
         if (X11->ptrXSelectExtensionEvent) {
@@ -1572,22 +1630,49 @@ void QWidgetPrivate::setWindowIconText_sys(const QString &iconText)
                     PropModeReplace, (unsigned char *) icon_name.constData(), icon_name.size());
 }
 
-
-void QWidget::grabMouse()
+void QWidgetPrivate::grabMouse_sys(Qt::HANDLE xcursorid)
 {
-    if (isVisible() && !qt_nograb()) {
-        if (QWidgetPrivate::mouseGrabber && QWidgetPrivate::mouseGrabber != this)
-            QWidgetPrivate::mouseGrabber->releaseMouse();
-        Q_ASSERT(testAttribute(Qt::WA_WState_Created));
-#ifndef QT_NO_DEBUG
-        int status =
+    Q_Q(QWidget);
+    if (q->isVisible() && !qt_nograb()) {
+        if (mouseGrabber && mouseGrabber != q)
+            mouseGrabber->releaseMouse();
+
+        Q_ASSERT(q->testAttribute(Qt::WA_WState_Created));
+        int status;
+#if !defined(QT_NO_XINPUT2)
+        if (X11->use_xinput) {
+            XIEventMask xieventmask;
+            uchar bitmask[2] = { 0, 0 };
+
+            xieventmask.deviceid = X11->xiMasterDeviceId;
+            xieventmask.mask = bitmask;
+            xieventmask.mask_len = sizeof(bitmask);
+
+            XISetMask(bitmask, XI_ButtonPress);
+            XISetMask(bitmask, XI_ButtonRelease);
+            XISetMask(bitmask, XI_Motion);
+            XISetMask(bitmask, XI_Enter);
+            XISetMask(bitmask, XI_Leave);
+
+            status = XIGrabDevice(X11->display,
+                                  X11->xiMasterDeviceId,
+                                  q->effectiveWinId(),
+                                  X11->time,
+                                  xcursorid,
+                                  GrabModeAsync,
+                                  GrabModeAsync,
+                                  False,
+                                  &xieventmask);
+        } else
 #endif
-            XGrabPointer(X11->display, effectiveWinId(), False,
-                          (uint)(ButtonPressMask | ButtonReleaseMask |
-                                  PointerMotionMask | EnterWindowMask |
-                                  LeaveWindowMask),
-                          GrabModeAsync, GrabModeAsync,
-                          XNone, XNone, X11->time);
+        {
+            status = XGrabPointer(X11->display, q->effectiveWinId(), False,
+                                  (uint)(ButtonPressMask | ButtonReleaseMask |
+                                         PointerMotionMask | EnterWindowMask |
+                                         LeaveWindowMask),
+                                  GrabModeAsync, GrabModeAsync,
+                                  XNone, xcursorid, X11->time);
+        }
 #ifndef QT_NO_DEBUG
         if (status) {
             const char *s =
@@ -1598,53 +1683,40 @@ void QWidget::grabMouse()
                 "<?>";
             qWarning("QWidget::grabMouse: Failed with %s", s);
         }
+#else
+        Q_UNUSED(status);
 #endif
-        QWidgetPrivate::mouseGrabber = this;
+        mouseGrabber = q;
     }
 }
 
+void QWidget::grabMouse()
+{
+    Q_D(QWidget);
+    d->grabMouse_sys(XNone);
+}
 
 #ifndef QT_NO_CURSOR
 void QWidget::grabMouse(const QCursor &cursor)
 {
-    if (!qt_nograb()) {
-        if (QWidgetPrivate::mouseGrabber && QWidgetPrivate::mouseGrabber != this)
-            QWidgetPrivate::mouseGrabber->releaseMouse();
-        Q_ASSERT(testAttribute(Qt::WA_WState_Created));
-#ifndef QT_NO_DEBUG
-        int status =
-#endif
-        XGrabPointer(X11->display, effectiveWinId(), False,
-                      (uint)(ButtonPressMask | ButtonReleaseMask |
-                             PointerMotionMask | EnterWindowMask | LeaveWindowMask),
-                      GrabModeAsync, GrabModeAsync,
-                      XNone, cursor.handle(), X11->time);
-#ifndef QT_NO_DEBUG
-        if (status) {
-            const char *s =
-                status == GrabNotViewable ? "\"GrabNotViewable\"" :
-                status == AlreadyGrabbed  ? "\"AlreadyGrabbed\"" :
-                status == GrabFrozen      ? "\"GrabFrozen\"" :
-                status == GrabInvalidTime ? "\"GrabInvalidTime\"" :
-                                            "<?>";
-            qWarning("QWidget::grabMouse: Failed with %s", s);
-        }
-#endif
-        QWidgetPrivate::mouseGrabber = this;
-    }
+    Q_D(QWidget);
+    d->grabMouse_sys(cursor.handle());
 }
 #endif
-
 
 void QWidget::releaseMouse()
 {
     if (!qt_nograb() && QWidgetPrivate::mouseGrabber == this) {
-        XUngrabPointer(X11->display, X11->time);
+#if !defined(QT_NO_XINPUT2)
+        if (X11->use_xinput)
+            XIUngrabDevice(X11->display, X11->xiMasterDeviceId, X11->time);
+        else
+#endif
+            XUngrabPointer(X11->display, X11->time);
         XFlush(X11->display);
         QWidgetPrivate::mouseGrabber = 0;
     }
 }
-
 
 void QWidget::grabKeyboard()
 {

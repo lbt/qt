@@ -827,6 +827,7 @@ CFG_DECORATION_AVAILABLE="styled windows default"
 CFG_DECORATION_ON="${CFG_DECORATION_AVAILABLE}" # all on by default
 CFG_DECORATION_PLUGIN_AVAILABLE=
 CFG_DECORATION_PLUGIN=
+CFG_XINPUT2=auto
 CFG_XINPUT=runtime
 CFG_XKB=auto
 CFG_NIS=auto
@@ -1125,7 +1126,7 @@ while [ "$#" -gt 0 ]; do
         VAL=no
         ;;
     #Qt style yes options
-    -incremental|-qvfb|-profile|-shared|-static|-sm|-xinerama|-xshape|-xsync|-xinput|-egl|-reduce-exports|-pch|-separate-debug-info|-stl|-freetype|-xcursor|-xfixes|-xrandr|-xrender|-mitshm|-fontconfig|-xkb|-nis|-qdbus|-dbus|-dbus-linked|-glib|-gstreamer|-gtkstyle|-cups|-iconv|-largefile|-h|-help|-v|-verbose|-debug|-release|-fast|-accessibility|-confirm-license|-gnumake|-framework|-qt3support|-debug-and-release|-exceptions|-cocoa|-carbon|-universal|-harfbuzz|-prefix-install|-silent|-armfpa|-optimized-qmake|-dwarf2|-reduce-relocations|-sse|-openssl|-openssl-linked|-ptmalloc|-xmlpatterns|-phonon|-phonon-backend|-multimedia|-audio-backend|-svg|-declarative|-declarative-debug|-javascript-jit|-script|-scripttools|-rpath|-force-pkg-config|-s60|-usedeffiles|-icu)
+    -incremental|-qvfb|-profile|-shared|-static|-sm|-xinerama|-xshape|-xsync|-xinput|-xinput2|-egl|-reduce-exports|-pch|-separate-debug-info|-stl|-freetype|-xcursor|-xfixes|-xrandr|-xrender|-mitshm|-fontconfig|-xkb|-nis|-qdbus|-dbus|-dbus-linked|-glib|-gstreamer|-gtkstyle|-cups|-iconv|-largefile|-h|-help|-v|-verbose|-debug|-release|-fast|-accessibility|-confirm-license|-gnumake|-framework|-qt3support|-debug-and-release|-exceptions|-cocoa|-carbon|-universal|-harfbuzz|-prefix-install|-silent|-armfpa|-optimized-qmake|-dwarf2|-reduce-relocations|-sse|-openssl|-openssl-linked|-ptmalloc|-xmlpatterns|-phonon|-phonon-backend|-multimedia|-audio-backend|-svg|-declarative|-declarative-debug|-javascript-jit|-script|-scripttools|-rpath|-force-pkg-config|-s60|-usedeffiles|-icu)
         VAR=`echo $1 | sed "s,^-\(.*\),\1,"`
         VAL=yes
         ;;
@@ -1812,6 +1813,13 @@ while [ "$#" -gt 0 ]; do
     xsync)
         if [ "$VAL" = "yes" ] || [ "$VAL" = "no" ]; then
             CFG_XSYNC="$VAL"
+        else
+            UNKNOWN_OPT=yes
+        fi
+        ;;
+     xinput2)
+        if [ "$VAL" = "yes" ] || [ "$VAL" = "no" ]; then
+            CFG_XINPUT2="$VAL"
         else
             UNKNOWN_OPT=yes
         fi
@@ -4252,6 +4260,13 @@ if [ "$PLATFORM_X11" = "yes" ]; then
         XMY="*"
         XMN=" "
     fi
+    if [ "$CFG_XINPUT2" = "no" ]; then
+        X2Y=" "
+        X2N="*"
+    else
+        X2Y="*"
+        X2N=" "
+    fi
     if [ "$CFG_XINPUT" = "no" ]; then
         XIY=" "
         XIN="*"
@@ -4356,7 +4371,10 @@ Qt/X11 only:
                          Requires fontconfig/fontconfig.h, libfontconfig,
                          freetype.h and libfreetype.
 
- $XIN  -no-xinput ......... Do not compile Xinput support.
+ $X2N  -no-xinput2......... Do not compile XInput2 support.
+ $X2Y  -xinput2............ Compile XInput2 support.
+
+ $XIN  -no-xinput.......... Do not compile Xinput support.
  $XIY  -xinput ............ Compile Xinput support. This also enabled tablet support
                          which requires IRIX with wacom.h and libXi or
                          XFree86 with X11/extensions/XInput.h and libXi.
@@ -6238,7 +6256,23 @@ if [ "$PLATFORM_X11" = "yes" ]; then
 	fi
     fi
 
-    # auto-detect Xinput support
+    # auto-detect XInput2/Xinput support
+    if [ "$CFG_XINPUT2" != "no" ]; then
+        if "$unixtests/compile.test" "$XQMAKESPEC" "$QMAKE_CONFIG" $OPT_VERBOSE "$relpath" "$outpath" config.tests/x11/xinput2 "XInput2" $L_FLAGS $I_FLAGS $l_FLAGS $X11TESTS_FLAGS; then
+	    CFG_XINPUT2=yes
+	    CFG_XINPUT=no
+        else
+            if [ "$CFG_XINPUT2" = "yes" ] && [ "$CFG_CONFIGURE_EXIT_ON_ERROR" = "yes" ]; then
+                echo "XInput2 support cannot be enabled due to functionality tests!"
+                echo " Turn on verbose messaging (-v) to $0 to see the final report."
+                echo " If you believe this message is in error you may use the continue"
+                echo " switch (-continue) to $0 to continue."
+                exit 101
+            else
+                CFG_XINPUT2=no
+            fi
+        fi
+    fi
     if [ "$CFG_XINPUT" != "no" ]; then
         if "$unixtests/compile.test" "$XQMAKESPEC" "$QMAKE_CONFIG" $OPT_VERBOSE "$relpath" "$outpath" config.tests/x11/xinput "XInput" $L_FLAGS $I_FLAGS $l_FLAGS $X11TESTS_FLAGS; then
 	    if [ "$CFG_XINPUT" != "runtime" ]; then
@@ -7462,8 +7496,11 @@ if [ "$PLATFORM_X11" = "yes" ]; then
     if [ "$CFG_FONTCONFIG" = "yes" ]; then
         QT_CONFIG="$QT_CONFIG fontconfig"
     fi
-    if [ "$CFG_XINPUT" = "yes" ]; then
+    if [ "$CFG_XINPUT2" = "yes" -o "$CFG_XINPUT" = "yes" ]; then
 	QMakeVar set QMAKE_LIBS_X11 '-lXi $$QMAKE_LIBS_X11'
+    fi
+    if [ "$CFG_XINPUT2" = "yes" ]; then
+	QT_CONFIG="$QT_CONFIG xinput2"
     fi
     if [ "$CFG_XINPUT" = "yes" ]; then
         QT_CONFIG="$QT_CONFIG xinput tablet"
@@ -8349,6 +8386,7 @@ fi
 [ "$CFG_ICONV" = "no" ]      && QCONFIG_FLAGS="$QCONFIG_FLAGS QT_NO_ICONV"
 [ "$CFG_GLIB" != "yes" ]     && QCONFIG_FLAGS="$QCONFIG_FLAGS QT_NO_GLIB"
 [ "$CFG_QGTKSTYLE" != "yes" ] && QCONFIG_FLAGS="$QCONFIG_FLAGS QT_NO_STYLE_GTK"
+
 if [ "$XPLATFORM_SYMBIAN" = "no" ]; then
     # Do not apply following negative X11/Unix/Mac only flags on Symbian, so that
     # configuration matches with the one generated by configure executable tool
@@ -8378,6 +8416,7 @@ if [ "$XPLATFORM_SYMBIAN" = "no" ]; then
     [ "$CFG_XVIDEO" = "no" ]     && QCONFIG_FLAGS="$QCONFIG_FLAGS QT_NO_XVIDEO"
     [ "$CFG_XSYNC" = "no" ]     && QCONFIG_FLAGS="$QCONFIG_FLAGS QT_NO_XSYNC"
     [ "$CFG_XINPUT" = "no" ]     && QCONFIG_FLAGS="$QCONFIG_FLAGS QT_NO_XINPUT QT_NO_TABLET"
+    [ "$CFG_XINPUT2" = "no" ]    && QCONFIG_FLAGS="$QCONFIG_FLAGS QT_NO_XINPUT2"
 
     [ "$CFG_XCURSOR" = "runtime" ]   && QCONFIG_FLAGS="$QCONFIG_FLAGS QT_RUNTIME_XCURSOR"
     [ "$CFG_XINERAMA" = "runtime" ]  && QCONFIG_FLAGS="$QCONFIG_FLAGS QT_RUNTIME_XINERAMA"
@@ -8947,6 +8986,7 @@ if [ "$PLATFORM_X11" = "yes" ]; then
     echo "Xfixes support ......... $CFG_XFIXES"
     echo "Xrandr support ......... $CFG_XRANDR"
     echo "Xrender support ........ $CFG_XRENDER"
+    echo "XInput2 support ........ $CFG_XINPUT2"
     echo "Xi support ............. $CFG_XINPUT"
     echo "MIT-SHM support ........ $CFG_MITSHM"
     echo "FontConfig support ..... $CFG_FONTCONFIG"

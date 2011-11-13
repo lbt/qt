@@ -3,6 +3,9 @@
 ** Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
 ** Contact: http://www.qt-project.org/
 **
+** Code contributions to adapt XInput2.0 portions to support multiple
+** connected input devices are Copyright (C) 2011 Intel Corporation
+**
 ** This file is part of the QtGui module of the Qt Toolkit.
 **
 ** $QT_BEGIN_LICENSE:LGPL$
@@ -125,9 +128,6 @@ extern "C" {
 
 #define XK_MISCELLANY
 #include <X11/keysymdef.h>
-#if !defined(QT_NO_XINPUT)
-#include <X11/extensions/XI.h>
-#endif
 
 #include <stdlib.h>
 #include <string.h>
@@ -326,6 +326,23 @@ static const char * x11_atomnames = {
     // Tablet
     "STYLUS\0"
     "ERASER\0"
+    
+    // XInput2
+
+    "Button Left\0"
+    "Button Middle\0"
+    "Button Right\0"
+    "Button Wheel Up\0"
+    "Button Wheel Down\0"
+    "Button Horiz Wheel Left\0"
+    "Button Horiz Wheel Right\0"
+    "Abs MT Position X\0"
+    "Abs MT Position Y\0"
+    "Abs MT Touch Major\0"
+    "Abs MT Touch Minor\0"
+    "Abs MT Pressure\0"
+    "Abs MT Tracking ID\0"
+    "Max Contacts\0"
 };
 
 Q_GUI_EXPORT QX11Data *qt_x11Data = 0;
@@ -373,7 +390,6 @@ static Window        mouseActWindow             = 0;        // window where mous
 static Qt::MouseButton  mouseButtonPressed   = Qt::NoButton; // last mouse button pressed
 static Qt::MouseButtons mouseButtonState     = Qt::NoButton; // mouse button state
 static Time        mouseButtonPressTime = 0;        // when was a button pressed
-static short        mouseXPos, mouseYPos;                // mouse pres position in act window
 static short        mouseGlobalXPos, mouseGlobalYPos; // global mouse press position
 
 extern QWidgetList *qt_modal_stack;                // stack of modal widgets
@@ -565,6 +581,15 @@ class QETWidget : public QWidget                // event translator widget
 public:
     QWidgetPrivate* d_func() { return QWidget::d_func(); }
     bool translateMouseEvent(const XEvent *);
+    bool sendMouseEvent(int xtype,
+                        Window window,
+                        QEvent::Type type,
+                        QPoint pos,
+                        QPoint globalPos,
+                        Qt::MouseButton button,
+                        Qt::MouseButtons buttons,
+                        Qt::KeyboardModifiers modifiers);
+
     void translatePaintEvent(const XEvent *);
     bool translateConfigEvent(const XEvent *);
     bool translateCloseEvent(const XEvent *);
@@ -575,6 +600,10 @@ public:
     bool translateXinputEvent(const XEvent*, QTabletDeviceData *tablet);
 #endif
     bool translatePropertyEvent(const XEvent *);
+
+#if !defined(QT_NO_XINPUT2)
+    bool translateXI2Event(const XIEvent *);
+#endif
 
     void doDeferredMap()
     {
@@ -697,7 +726,7 @@ static int qt_x_errhandler(Display *dpy, XErrorEvent *err)
 
     default:
 #if !defined(QT_NO_XINPUT)
-        if (err->request_code == X11->xinput_major
+        if (err->request_code == X11->xinput_opcode
             && err->error_code == (X11->xinput_errorbase + XI_BadDevice)
             && err->minor_code == 3 /* X_OpenDevice */) {
             return 0;
@@ -728,7 +757,7 @@ static int qt_x_errhandler(Display *dpy, XErrorEvent *err)
             extensionName = "RENDER";
         else if (err->request_code == X11->xrandr_major)
             extensionName = "RANDR";
-        else if (err->request_code == X11->xinput_major)
+        else if (err->request_code == X11->xinput_opcode)
             extensionName = "XInputExtension";
         else if (err->request_code == X11->mitshm_major)
             extensionName = "MIT-SHM";
@@ -1629,6 +1658,116 @@ static void getXDefault(const char *group, const char *key, bool *val)
 }
 #endif
 
+#if !defined(QT_NO_XINPUT2)
+// xiFindActiveDevice
+// Used to determine if an input event's reported device Id is for
+// either the Master core pointer or one of the attached Touch
+// devices
+int xiFindActiveDevice(int deviceId)
+{
+    if (!X11->xiDeviceInfo)
+        return -1;
+
+    foreach (int id, X11->xiActiveDevices) {
+        if (id == deviceId) {
+            for (int i = 0; i < X11->xiDeviceCount; i++)
+                if (X11->xiDeviceInfo[i].deviceid == deviceId)
+                    return i;
+        }
+    }
+
+    return -1;
+}
+
+// xiFreeDevices
+// Helper function to clean up a few duplications of code
+void xiFreeDevices()
+{
+    if (X11->xiDeviceInfo) {
+        X11->xiIsTouch.clear();
+        X11->xibuttonclassinfo = 0;
+        XIFreeDeviceInfo(X11->xiDeviceInfo);
+    }
+}
+
+// xiEnumerateDevices
+// Query X for the full set of all input devices and attach to
+// the first Virtual Core Pointer found, recording it as the
+// xiMasterDeviceId Additionally, attach to any Touch enabled device
+// that is either a Slave of that Core Pointer or is Floating
+void xiEnumerateDevices()
+{
+    xiFreeDevices();
+
+    XIDeviceInfo *info;
+    X11->xiDeviceInfo = XIQueryDevice(QX11Info::display(), XIAllDevices, &X11->xiDeviceCount);
+    X11->xiIsTouch.reserve(X11->xiDeviceCount);
+
+    // We connect to only the first Master Pointer for Touch and Pointer events.
+    // We connect to any Floating Slave pointers for Touch
+    X11->xiMasterIndex = -1;
+    X11->xiMasterDeviceId = -1;
+    bool xiDebug = false;
+    if (qgetenv("QT_XINPUT_DEBUG") == "1")
+        xiDebug = true;
+
+    for (int i = 0; i < X11->xiDeviceCount; i++) {
+        info = &X11->xiDeviceInfo[i];
+        X11->xiIsTouch << false;
+
+#define XI_DEBUG if (xiDebug) qDebug()
+
+        // We will only take the first slave pointers from the first master pointer we find; we do not
+        if (info->use == XIMasterPointer && X11->xiMasterIndex != -1) {
+            XI_DEBUG << "Skipping additional Master Pointer:" << info->name << "(" << info->deviceid << ")";
+            continue;
+        }
+
+        if (info->use == XIMasterPointer) {
+            X11->xiMasterIndex = i;
+            X11->xiMasterDeviceId = info->deviceid;
+            X11->xiIsTouch[i] = false;
+            XI_DEBUG << "Adding Master Pointer:" << info->name << "(" << info->deviceid << ")";
+            X11->xiActiveDevices.append(info->deviceid);
+            for (int j = 0; j < info->num_classes; ++j) {
+                if (info->classes[j]->type == XIButtonClass) {
+                    X11->xibuttonclassinfo = (XIButtonClassInfo *) info->classes[j];
+                    break;
+                }
+            }
+            continue;
+        }
+
+        if (info->use == XIFloatingSlave || info->use == XISlavePointer) {
+            if (info->use == XISlavePointer && info->attachment != X11->xiMasterDeviceId) {
+                XI_DEBUG << "Skipping Slave on non-Master:" << info->name << "(" << info->deviceid << ")";
+                continue;
+            }
+
+            for (int j = 0; j < info->num_classes; j++) {
+                if (info->classes[j]->type == XIValuatorClass) {
+                    XIValuatorClassInfo *valuator = (XIValuatorClassInfo *)(info->classes[j]);
+                    // If this device doesn't support the AbsMTTrackingID then we can't use it as a touch device
+                    if (valuator->label == ATOM(AbsMTTrackingID)) {
+                        X11->xiIsTouch[i] = true;
+                        break;
+                    }
+                }
+            }
+
+            if (X11->xiIsTouch[i]) {
+                XI_DEBUG << "Adding" << (info->use == XIFloatingSlave ? "FLOATING" : "ATTACHED") << "touch device:" << info->name << "(" << info->deviceid << ")";
+                X11->xiActiveDevices.append(info->deviceid);
+            } else {
+                XI_DEBUG << "Skipping non-Touch device:" << info->name << "(" << info->deviceid << ")";
+            }
+        }
+    }
+}
+
+#endif
+
+
 // ### This should be static but it isn't because of the friend declaration
 // ### in qpaintdevice.h which then should have a static too but can't have
 // ### it because "storage class specifiers invalid in friend function
@@ -1661,9 +1800,14 @@ void qt_init(QApplicationPrivate *priv, int,
 
     // XInputExtension
     X11->use_xinput = false;
-    X11->xinput_major = 0;
+    X11->xinput_opcode = 0;
     X11->xinput_eventbase = 0;
     X11->xinput_errorbase = 0;
+#if !defined(QT_NO_XINPUT2)
+    X11->xiDeviceInfo = 0;
+    X11->xiDeviceCount = 0;
+    X11->xiMasterIndex = 0;
+#endif
 
     X11->use_xkb = false;
     X11->xkb_major = 0;
@@ -2142,14 +2286,40 @@ void qt_init(QApplicationPrivate *priv, int,
 #endif // QT_RUNTIME_XINERAMA
 #endif // QT_NO_XINERAMA
 
-#ifndef QT_NO_XINPUT
+#if !defined(QT_NO_XINPUT2)
+        X11->use_xinput = XQueryExtension(X11->display, "XInputExtension", &X11->xinput_opcode,
+                                          &X11->xinput_eventbase, &X11->xinput_errorbase);
+        if (X11->use_xinput) {
+            // we want XInput2
+            int ximajor = 2, ximinor = 0;
+            if (XIQueryVersion(X11->display, &ximajor, &ximinor) == BadRequest) {
+                // XInput2 not available
+                X11->use_xinput = false;
+            } else {
+                // XInput2 available, select for XI_HierarchyChanged events. we use these
+                // events to make sure that we follow device capability changes
+                XIEventMask xieventmask;
+                uchar bitmask[2] = { 0, 0 };
+                XISetMask(bitmask, XI_DeviceChanged);
+                XISetMask(bitmask, XI_HierarchyChanged);
+
+                xieventmask.deviceid = XIAllDevices;
+                xieventmask.mask = bitmask;
+                xieventmask.mask_len = sizeof(bitmask);
+
+                XISelectEvents(X11->display, DefaultRootWindow(X11->display), &xieventmask, 1);
+
+                xiEnumerateDevices();
+            }
+        }
+#elif !defined(QT_NO_XINPUT)
         // See if Xinput is supported on the connected display
         X11->ptrXCloseDevice = 0;
         X11->ptrXListInputDevices = 0;
         X11->ptrXOpenDevice = 0;
         X11->ptrXFreeDeviceList = 0;
         X11->ptrXSelectExtensionEvent = 0;
-        X11->use_xinput = XQueryExtension(X11->display, "XInputExtension", &X11->xinput_major,
+        X11->use_xinput = XQueryExtension(X11->display, "XInputExtension", &X11->xinput_opcode,
                                           &X11->xinput_eventbase, &X11->xinput_errorbase);
         if (X11->use_xinput) {
             X11->ptrXCloseDevice = XINPUT_LOAD(XCloseDevice);
@@ -2668,6 +2838,10 @@ void qt_cleanup()
         qt_save_rootinfo();
 
     if (qt_is_gui_used) {
+#if !defined(QT_NO_XINPUT2)
+        xiFreeDevices();
+#endif
+
         QPixmapCache::clear();
         QCursorData::cleanup();
         QFont::cleanup();
@@ -3131,6 +3305,39 @@ static QETWidget *qPRFindWidget(Window oldwin)
     return wPRmapper ? (QETWidget*)wPRmapper->value((int)oldwin, 0) : 0;
 }
 
+// XEvent processing
+
+#if !defined(QT_NO_XINPUT2)
+
+extern "C" {
+
+    static Bool qt_XI_Wheel_scanner(Display *display, XEvent *event, XPointer arg)
+    {
+        XIDeviceEvent *originalevent = (XIDeviceEvent *) arg;
+        bool returnValue = false;
+        if (event->type == GenericEvent
+                && event->xcookie.extension == X11->xinput_opcode
+                && event->xcookie.evtype == XI_ButtonPress) {
+            XGetEventData(display, &event->xcookie);
+            XIDeviceEvent *deviceevent = (XIDeviceEvent *) event->xcookie.data;
+            // compress this event if it's the same button on the same window
+            if ((returnValue = (deviceevent->event == originalevent->event
+                                && deviceevent->detail == originalevent->detail))) {
+                // do *NOT* use XFreeEventData() when we have not compressed
+                // the event, as it will remove the cookie data completely from
+                // the event. Instead we let x11ProcessEvents() call
+                // XFreeEventData() once this event has been pulled of the
+                // queue for normal processing.
+                XFreeEventData(display, &event->xcookie);
+            }
+        }
+        return returnValue;
+    }
+
+}
+
+#endif
+
 int QApplication::x11ClientMessage(QWidget* w, XEvent* event, bool passive_only)
 {
     if (w && !w->internalWinId())
@@ -3256,7 +3463,74 @@ int QApplication::x11ProcessEvent(XEvent* event)
     }
 #endif
 
-    QETWidget *widget = (QETWidget*)QWidget::find((WId)event->xany.window);
+    QETWidget *widget = 0;
+#if !defined(QT_NO_XINPUT2)
+    bool isXI2Event = false;
+    if (event->type == GenericEvent) {
+        // event->xany.window is not usable for these events
+        if (X11->use_xinput
+            && XGetEventData(X11->display, &event->xcookie)
+            && event->xcookie.extension == X11->xinput_opcode) {
+            // remember for later
+            isXI2Event = true;
+
+            // look up widget based on the type of event we received
+            switch (event->xcookie.evtype) {
+            case XI_DeviceChanged:
+                {
+                    XIDeviceChangedEvent *xidevicechangedevent = (XIDeviceChangedEvent *) event->xcookie.data;
+                    if (xidevicechangedevent->reason == XISlaveSwitch) {
+                        qDebug("XISlaveSwitch");
+                        xiEnumerateDevices();
+                    } else {
+                        // ### TODO: handle this type of event
+                        qDebug("XI_DeviceChanged, id %d, source %d, reason %d",
+                               xidevicechangedevent->deviceid,
+                               xidevicechangedevent->sourceid,
+                               xidevicechangedevent->reason);
+                    }
+                    break;
+                }
+            case XI_HierarchyChanged:
+                // ### TODO: handle this type of event
+                qDebug("XI_HierarchyChanged");
+                xiEnumerateDevices();
+                break;
+            case XI_ButtonPress:
+            case XI_ButtonRelease:
+            case XI_Motion:
+                // all of these events send XIDeviceEvents
+                widget = (QETWidget *) QWidget::find(((XIDeviceEvent *) event->xcookie.data)->event);
+                break;
+            case XI_Enter:
+            case XI_Leave:
+                // all of these events send XIEnterEvents
+                widget = (QETWidget *) QWidget::find(((XIEnterEvent *) event->xcookie.data)->event);
+                break;
+            }
+        }
+    } else
+#endif
+    {        
+        widget = (QETWidget*)QWidget::find((WId)event->xany.window);
+    }
+
+#if !defined(QT_NO_XINPUT2)
+    // make sure XFreeEventData() is called at every return point
+    class CallXFreeEventData
+    {
+        Display *display;
+        XGenericEventCookie *cookie;
+    public:
+        CallXFreeEventData(Display *display, XGenericEventCookie *cookie)
+            : display(display), cookie(cookie)
+        { }
+        ~CallXFreeEventData()
+        {
+            XFreeEventData(display, cookie);
+        }
+    } instance(X11->display, &event->xcookie);
+#endif
 
     if (wPRmapper) {                                // just did a widget reparent?
         if (widget == 0) {                        // not in std widget mapper
@@ -3268,6 +3542,17 @@ int QApplication::x11ProcessEvent(XEvent* event)
             case XKeyRelease:
                 widget = qPRFindWidget(event->xany.window);
                 break;
+#if !defined(QT_NO_XINPUT2)
+            case GenericEvent:
+                // as above, event->xany.window is unusable for these events
+                if (X11->use_xinput) {
+                    if (event->xcookie.extension != X11->xinput_opcode)
+                        break;
+                    widget = qPRFindWidget(((XIDeviceEvent *) event->xcookie.data)->event);
+                    break;
+                }
+                break;
+#endif
             }
         }
         else if (widget->testAttribute(Qt::WA_WState_Reparented))
@@ -3387,6 +3672,19 @@ int QApplication::x11ProcessEvent(XEvent* event)
             case ButtonRelease:
             case XKeyPress:
             case XKeyRelease:
+#if !defined(QT_NO_XINPUT2)
+            case GenericEvent:
+                if (X11->use_xinput) {
+                    if (event->xcookie.extension != X11->xinput_opcode
+                        || (event->xcookie.evtype != XI_ButtonPress
+                            && event->xcookie.evtype != XI_ButtonRelease))
+                        break;
+                    // Button press/release from XI2, allow event to fallthrough
+                } else {
+                    break;
+                }
+                // fallthrough intended
+#endif
                 do {
                     popup->close();
                 } while ((popup = qApp->activePopupWidget()));
@@ -3472,21 +3770,64 @@ int QApplication::x11ProcessEvent(XEvent* event)
     }
 #endif // QT_NO_XFIXES
 
-    switch (event->type) {
+    int inputEventType = event->type;
+#if !defined(QT_NO_XINPUT2)
+    XIDeviceEvent *xievent = 0;
+    if (isXI2Event) {
+        xievent = (XIDeviceEvent *) event->xcookie.data;
+        X11->time = xievent->time;
 
+        switch (xievent->evtype) {
+            break;
+        case XI_ButtonPress:
+            pressed_window = xievent->event;
+            inputEventType = ButtonPress;
+            break;
+        case XI_ButtonRelease:
+            inputEventType = ButtonRelease;
+            break;
+        case XI_Motion:
+            inputEventType = MotionNotify;
+            break;
+        case XI_Enter:
+            inputEventType = EnterNotify;
+            break;
+        case XI_Leave:
+            inputEventType = LeaveNotify;
+            break;
+        case XI_DeviceChanged:
+            // unreachable, should already be handled above (allow fallthrough)
+        default:
+            qWarning("Qt: Unknown XI2 event %d", xievent->evtype);
+            // must return, don't know that this event can be cast to XIDeviceEvent
+            return 0;
+        }
+    }
+#endif
+
+    bool handled = true;
+    switch (inputEventType) {
     case ButtonRelease:                        // mouse event
-        if (!d->inPopupMode() && !QWidget::mouseGrabber() && pressed_window != widget->internalWinId()
+        if (!d->inPopupMode()
+            && !QWidget::mouseGrabber()
+            && pressed_window != widget->internalWinId()
             && (widget = (QETWidget*) QWidget::find((WId)pressed_window)) == 0)
             break;
         // fall through intended
     case ButtonPress:
-        if (event->xbutton.root != RootWindow(X11->display, widget->x11Info().screen())
+        if ((
+#if !defined(QT_NO_XINPUT2)
+             isXI2Event
+             ? xievent->root != RootWindow(X11->display, widget->x11Info().screen())
+             :
+#endif
+               event->xbutton.root != RootWindow(X11->display, widget->x11Info().screen()))
             && ! qt_xdnd_dragging) {
             while (activePopupWidget())
                 activePopupWidget()->close();
             return 1;
         }
-        if (event->type == ButtonPress)
+        if (inputEventType == ButtonPress)
             qt_net_update_user_time(widget->window(), X11->userTime);
         // fall through intended
     case MotionNotify:
@@ -3494,15 +3835,29 @@ int QApplication::x11ProcessEvent(XEvent* event)
         if (!qt_tabletChokeMouse) {
 #endif
             if (widget->testAttribute(Qt::WA_TransparentForMouseEvents)) {
-                QPoint pos(event->xbutton.x, event->xbutton.y);
+                QPoint pos =
+#if !defined(QT_NO_XINPUT2)
+                    isXI2Event
+                    ? QPoint(xievent->event_x, xievent->event_y)
+                    :
+#endif
+                      QPoint(event->xbutton.x, event->xbutton.y);
                 pos = widget->d_func()->mapFromWS(pos);
                 QWidget *window = widget->window();
                 pos = widget->mapTo(window, pos);
                 if (QWidget *child = window->childAt(pos)) {
                     widget = static_cast<QETWidget *>(child);
                     pos = child->mapFrom(window, pos);
-                    event->xbutton.x = pos.x();
-                    event->xbutton.y = pos.y();
+#if !defined(QT_NO_XINPUT2)
+                    if (isXI2Event) {
+                        xievent->event_y = pos.y();
+                        xievent->event_x = pos.x();
+                    } else
+#endif
+                    {
+                        event->xbutton.x = pos.x();
+                        event->xbutton.y = pos.y();
+                    }
                 }
             }
             widget->translateMouseEvent(event);
@@ -3511,6 +3866,260 @@ int QApplication::x11ProcessEvent(XEvent* event)
             qt_tabletChokeMouse = false;
         }
 #endif
+        break;
+    case EnterNotify:
+        {                        // enter window
+            if (QWidget::mouseGrabber() && (!d->inPopupMode() || widget->window() != activePopupWidget()))
+                break;
+            int mode;
+            int detail;
+            bool focus;
+            int x, y;
+#if !defined(QT_NO_XINPUT2)
+            if (isXI2Event) {
+                XIEnterEvent *xienterevent = (XIEnterEvent *) event->xcookie.data;
+
+                if (X11->xiMasterIndex != -1 &&
+                    X11->xiMasterDeviceId == xienterevent->deviceid)
+                    break;
+
+                mode = xienterevent->mode;
+                detail = xienterevent->detail;
+                focus = xienterevent->focus;
+                x = xienterevent->event_x;
+                y = xienterevent->event_y;
+            } else
+#endif
+            {
+                mode = event->xcrossing.mode;
+                detail = event->xcrossing.detail;
+                focus = event->xcrossing.focus;
+                x = event->xcrossing.x;
+                y = event->xcrossing.y;
+            }
+
+            if ((mode != NotifyNormal
+                 && mode != NotifyUngrab)
+                || detail == NotifyVirtual
+                || detail == NotifyNonlinearVirtual)
+                break;
+            if (focus &&
+                !(widget->windowType() == Qt::Desktop) && !widget->isActiveWindow()) {
+                if (X11->focus_model == QX11Data::FM_Unknown) // check focus model
+                    qt_check_focus_model();
+                if (X11->focus_model == QX11Data::FM_PointerRoot) // PointerRoot mode
+                    setActiveWindow(widget);
+            }
+
+            if (qt_button_down && !d->inPopupMode())
+                break;
+
+            QWidget *alien = widget->childAt(widget->d_func()->mapFromWS(QPoint(x, y)));
+            QWidget *enter = alien ? alien : widget;
+            QWidget *leave = 0;
+            if (qt_last_mouse_receiver && !qt_last_mouse_receiver->internalWinId())
+                leave = qt_last_mouse_receiver;
+            else
+                leave = QWidget::find(curWin);
+
+            // ### Alien: enter/leave might be wrong here with overlapping siblings
+            // if the enter widget is native and stacked under a non-native widget.
+            QApplicationPrivate::dispatchEnterLeave(enter, leave);
+            curWin = widget->internalWinId();
+            qt_last_mouse_receiver = enter;
+            if (!d->inPopupMode() || widget->window() == activePopupWidget())
+                widget->translateMouseEvent(event); //we don't get MotionNotify, emulate it
+            break;
+        }
+    case LeaveNotify:
+        {                        // leave window
+            QWidget *mouseGrabber = QWidget::mouseGrabber();
+            if (mouseGrabber && !d->inPopupMode())
+                break;
+            if (curWin && widget->internalWinId() != curWin)
+                break;
+            int mode;
+            int detail;
+            bool focus;
+            int x, y;
+#if !defined(QT_NO_XINPUT2)
+            if (isXI2Event) {
+                XIEnterEvent *xienterevent = (XIEnterEvent *) event->xcookie.data;
+
+                if (X11->xiMasterIndex != -1 &&
+                    X11->xiMasterDeviceId == xienterevent->deviceid)
+                    break;
+
+                mode = xienterevent->mode;
+                detail = xienterevent->detail;
+                focus = xienterevent->focus;
+                x = xienterevent->event_x;
+                y = xienterevent->event_y;
+            } else
+#endif
+            {
+                mode = event->xcrossing.mode;
+                detail = event->xcrossing.detail;
+                focus = event->xcrossing.focus;
+                x = event->xcrossing.x;
+                y = event->xcrossing.y;
+            }
+
+            if ((mode != NotifyNormal
+                 && mode != NotifyUngrab)
+                || detail == NotifyInferior)
+                break;
+            if (!(widget->windowType() == Qt::Desktop))
+                widget->translateMouseEvent(event); //we don't get MotionNotify, emulate it
+
+            // look for an EnterNotify to match this LeaveNotify
+            QWidget* enter = 0;
+            QPoint enterPoint;
+            XEvent ev;
+#if !defined(QT_NO_XINPUT2)
+            if (isXI2Event) {
+                // ### TODO: port code below (Leave->Enter matching) to XI2
+            } else
+#endif
+            {
+                while (XCheckMaskEvent(X11->display, EnterWindowMask | LeaveWindowMask , &ev)
+                    && !qt_x11EventFilter(&ev)) {
+                    QWidget* event_widget = QWidget::find(ev.xcrossing.window);
+                    if(event_widget && event_widget->x11Event(&ev))
+                        break;
+                    if (ev.type == LeaveNotify
+                        || (ev.xcrossing.mode != NotifyNormal
+                            && ev.xcrossing.mode != NotifyUngrab)
+                        || ev.xcrossing.detail == NotifyVirtual
+                        || ev.xcrossing.detail == NotifyNonlinearVirtual)
+                        continue;
+                    enter = event_widget;
+                    if (enter)
+                        enterPoint = enter->d_func()->mapFromWS(QPoint(ev.xcrossing.x, ev.xcrossing.y));
+                    if (ev.xcrossing.focus &&
+                        enter && !(enter->windowType() == Qt::Desktop) && !enter->isActiveWindow()) {
+                        if (X11->focus_model == QX11Data::FM_Unknown) // check focus model
+                            qt_check_focus_model();
+                        if (X11->focus_model == QX11Data::FM_PointerRoot) // PointerRoot mode
+                            setActiveWindow(enter);
+                    }
+                    break;
+                }
+            }
+
+            if ((! enter || (enter->windowType() == Qt::Desktop)) &&
+                focus && widget == QApplicationPrivate::active_window &&
+                X11->focus_model == QX11Data::FM_PointerRoot // PointerRoot mode
+                ) {
+                setActiveWindow(0);
+            }
+
+            if (qt_button_down && !d->inPopupMode())
+                break;
+
+            if (!curWin)
+                QApplicationPrivate::dispatchEnterLeave(widget, 0);
+
+            if (enter) {
+                QWidget *alienEnter = enter->childAt(enterPoint);
+                if (alienEnter)
+                    enter = alienEnter;
+            }
+
+            QWidget *leave = qt_last_mouse_receiver ? qt_last_mouse_receiver : widget;
+            QWidget *activePopupWidget = qApp->activePopupWidget();
+
+            if (mouseGrabber && activePopupWidget && leave == activePopupWidget)
+                enter = mouseGrabber;
+            else if (enter != widget && mouseGrabber) {
+                if (!widget->rect().contains(widget->d_func()->mapFromWS(QPoint(x, y))))
+                    break;
+            }
+
+            QApplicationPrivate::dispatchEnterLeave(enter, leave);
+            qt_last_mouse_receiver = enter;
+
+            if (enter && QApplicationPrivate::tryModalHelper(enter, 0)) {
+                QWidget *nativeEnter = enter->internalWinId() ? enter : enter->nativeParentWidget();
+                curWin = nativeEnter->internalWinId();
+                static_cast<QETWidget *>(nativeEnter)->translateMouseEvent(&ev); //we don't get MotionNotify, emulate it
+            } else {
+                curWin = 0;
+                qt_last_mouse_receiver = 0;
+            }
+            break;
+        }
+
+    default:
+        handled = false;
+        break;
+    }
+    if (handled)
+        return 0;
+
+    switch (event->type) {
+    case XFocusIn: {                                // got focus
+        if ((widget->windowType() == Qt::Desktop))
+            break;
+        if (d->inPopupMode()) // some delayed focus event to ignore
+            break;
+        if (!widget->isWindow())
+            break;
+
+        if (event->xfocus.detail != NotifyAncestor &&
+            event->xfocus.detail != NotifyInferior &&
+            event->xfocus.detail != NotifyNonlinear)
+            break;
+
+        setActiveWindow(widget);
+        if (X11->focus_model == QX11Data::FM_PointerRoot) {
+            // We got real input focus from somewhere, but we were in PointerRoot
+            // mode, so we don't trust this event.  Check the focus model to make
+            // sure we know what focus mode we are using...
+            qt_check_focus_model();
+        }
+    }
+        break;
+
+    case XFocusOut: {                              // lost focus
+        if ((widget->windowType() == Qt::Desktop))
+            break;
+        if (!widget->isWindow())
+            break;
+
+        if (event->xfocus.mode == NotifyGrab) {
+            qt_xfocusout_grab_counter++;
+            break;
+        }
+        if (event->xfocus.detail != NotifyAncestor &&
+            event->xfocus.detail != NotifyNonlinearVirtual &&
+            event->xfocus.detail != NotifyNonlinear)
+            break;
+
+        if (!d->inPopupMode() && widget == QApplicationPrivate::active_window) {
+            XEvent ev;
+            QWidget *focusInWidget = 0;
+            bool focus_will_change = false;
+            if (XCheckTypedEvent(X11->display, XFocusIn, &ev)) {
+                // we're about to get an XFocusIn, if we know we will
+                // get a new active window, we don't want to set the
+                // active window to 0 now
+                focusInWidget = QWidget::find(ev.xany.window);
+                XPutBackEvent(X11->display, &ev);
+            }
+
+            if (focusInWidget
+                && focusInWidget->windowType() != Qt::Desktop
+                && !d->inPopupMode() // some delayed focus event to ignore
+                && focusInWidget->isWindow()
+                && (ev.xfocus.detail == NotifyAncestor
+                    || ev.xfocus.detail == NotifyInferior
+                    || ev.xfocus.detail == NotifyNonlinear))
+                focus_will_change = true;
+            if (!focus_will_change)
+                setActiveWindow(0);
+        }
+    }
         break;
 
     case XKeyPress:                                // keyboard event
@@ -3533,185 +4142,6 @@ int QApplication::x11ProcessEvent(XEvent* event)
     case ConfigureNotify:                        // window move/resize event
         if (event->xconfigure.event == event->xconfigure.window)
             widget->translateConfigEvent(event);
-        break;
-
-    case XFocusIn: {                                // got focus
-        if ((widget->windowType() == Qt::Desktop))
-            break;
-        if (d->inPopupMode()) // some delayed focus event to ignore
-            break;
-        if (!widget->isWindow())
-            break;
-        if (event->xfocus.detail != NotifyAncestor &&
-            event->xfocus.detail != NotifyInferior &&
-            event->xfocus.detail != NotifyNonlinear)
-            break;
-        setActiveWindow(widget);
-        if (X11->focus_model == QX11Data::FM_PointerRoot) {
-            // We got real input focus from somewhere, but we were in PointerRoot
-            // mode, so we don't trust this event.  Check the focus model to make
-            // sure we know what focus mode we are using...
-            qt_check_focus_model();
-        }
-    }
-        break;
-
-    case XFocusOut:                                // lost focus
-        if ((widget->windowType() == Qt::Desktop))
-            break;
-        if (!widget->isWindow())
-            break;
-        if (event->xfocus.mode == NotifyGrab) {
-            qt_xfocusout_grab_counter++;
-            break;
-        }
-        if (event->xfocus.detail != NotifyAncestor &&
-            event->xfocus.detail != NotifyNonlinearVirtual &&
-            event->xfocus.detail != NotifyNonlinear)
-            break;
-        if (!d->inPopupMode() && widget == QApplicationPrivate::active_window) {
-            XEvent ev;
-            bool focus_will_change = false;
-            if (XCheckTypedEvent(X11->display, XFocusIn, &ev)) {
-                // we're about to get an XFocusIn, if we know we will
-                // get a new active window, we don't want to set the
-                // active window to 0 now
-                QWidget *w2 = QWidget::find(ev.xany.window);
-                if (w2
-                    && w2->windowType() != Qt::Desktop
-                    && !d->inPopupMode() // some delayed focus event to ignore
-                    && w2->isWindow()
-                    && (ev.xfocus.detail == NotifyAncestor
-                        || ev.xfocus.detail == NotifyInferior
-                        || ev.xfocus.detail == NotifyNonlinear))
-                    focus_will_change = true;
-
-                XPutBackEvent(X11->display, &ev);
-            }
-            if (!focus_will_change)
-                setActiveWindow(0);
-        }
-        break;
-
-    case EnterNotify: {                        // enter window
-        if (QWidget::mouseGrabber() && (!d->inPopupMode() || widget->window() != activePopupWidget()))
-            break;
-        if ((event->xcrossing.mode != NotifyNormal
-             && event->xcrossing.mode != NotifyUngrab)
-            || event->xcrossing.detail == NotifyVirtual
-            || event->xcrossing.detail == NotifyNonlinearVirtual)
-            break;
-        if (event->xcrossing.focus &&
-            !(widget->windowType() == Qt::Desktop) && !widget->isActiveWindow()) {
-            if (X11->focus_model == QX11Data::FM_Unknown) // check focus model
-                qt_check_focus_model();
-            if (X11->focus_model == QX11Data::FM_PointerRoot) // PointerRoot mode
-                setActiveWindow(widget);
-        }
-
-        if (qt_button_down && !d->inPopupMode())
-            break;
-
-        QWidget *alien = widget->childAt(widget->d_func()->mapFromWS(QPoint(event->xcrossing.x,
-                                                                            event->xcrossing.y)));
-        QWidget *enter = alien ? alien : widget;
-        QWidget *leave = 0;
-        if (qt_last_mouse_receiver && !qt_last_mouse_receiver->internalWinId())
-            leave = qt_last_mouse_receiver;
-        else
-            leave = QWidget::find(curWin);
-
-        // ### Alien: enter/leave might be wrong here with overlapping siblings
-        // if the enter widget is native and stacked under a non-native widget.
-        QApplicationPrivate::dispatchEnterLeave(enter, leave);
-        curWin = widget->internalWinId();
-        qt_last_mouse_receiver = enter;
-        if (!d->inPopupMode() || widget->window() == activePopupWidget())
-            widget->translateMouseEvent(event); //we don't get MotionNotify, emulate it
-    }
-        break;
-    case LeaveNotify: {                        // leave window
-        QWidget *mouseGrabber = QWidget::mouseGrabber();
-        if (mouseGrabber && !d->inPopupMode())
-            break;
-        if (curWin && widget->internalWinId() != curWin)
-            break;
-        if ((event->xcrossing.mode != NotifyNormal
-            && event->xcrossing.mode != NotifyUngrab)
-            || event->xcrossing.detail == NotifyInferior)
-            break;
-        if (!(widget->windowType() == Qt::Desktop))
-            widget->translateMouseEvent(event); //we don't get MotionNotify, emulate it
-
-        QWidget* enter = 0;
-        QPoint enterPoint;
-        XEvent ev;
-        while (XCheckMaskEvent(X11->display, EnterWindowMask | LeaveWindowMask , &ev)
-               && !qt_x11EventFilter(&ev)) {
-            QWidget* event_widget = QWidget::find(ev.xcrossing.window);
-            if(event_widget && event_widget->x11Event(&ev))
-                break;
-            if (ev.type == LeaveNotify
-                || (ev.xcrossing.mode != NotifyNormal
-                    && ev.xcrossing.mode != NotifyUngrab)
-                || ev.xcrossing.detail == NotifyVirtual
-                || ev.xcrossing.detail == NotifyNonlinearVirtual)
-                continue;
-            enter = event_widget;
-            if (enter)
-                enterPoint = enter->d_func()->mapFromWS(QPoint(ev.xcrossing.x, ev.xcrossing.y));
-            if (ev.xcrossing.focus &&
-                enter && !(enter->windowType() == Qt::Desktop) && !enter->isActiveWindow()) {
-                if (X11->focus_model == QX11Data::FM_Unknown) // check focus model
-                    qt_check_focus_model();
-                if (X11->focus_model == QX11Data::FM_PointerRoot) // PointerRoot mode
-                    setActiveWindow(enter);
-            }
-            break;
-        }
-
-        if ((! enter || (enter->windowType() == Qt::Desktop)) &&
-            event->xcrossing.focus && widget == QApplicationPrivate::active_window &&
-            X11->focus_model == QX11Data::FM_PointerRoot // PointerRoot mode
-            ) {
-            setActiveWindow(0);
-        }
-
-        if (qt_button_down && !d->inPopupMode())
-            break;
-
-        if (!curWin)
-            QApplicationPrivate::dispatchEnterLeave(widget, 0);
-
-        if (enter) {
-            QWidget *alienEnter = enter->childAt(enterPoint);
-            if (alienEnter)
-                enter = alienEnter;
-        }
-
-        QWidget *leave = qt_last_mouse_receiver ? qt_last_mouse_receiver : widget;
-        QWidget *activePopupWidget = qApp->activePopupWidget();
-
-        if (mouseGrabber && activePopupWidget && leave == activePopupWidget)
-            enter = mouseGrabber;
-        else if (enter != widget && mouseGrabber) {
-            if (!widget->rect().contains(widget->d_func()->mapFromWS(QPoint(event->xcrossing.x,
-                                                                            event->xcrossing.y))))
-                break;
-        }
-
-        QApplicationPrivate::dispatchEnterLeave(enter, leave);
-        qt_last_mouse_receiver = enter;
-
-        if (enter && QApplicationPrivate::tryModalHelper(enter, 0)) {
-            QWidget *nativeEnter = enter->internalWinId() ? enter : enter->nativeParentWidget();
-            curWin = nativeEnter->internalWinId();
-            static_cast<QETWidget *>(nativeEnter)->translateMouseEvent(&ev); //we don't get MotionNotify, emulate it
-        } else {
-            curWin = 0;
-            qt_last_mouse_receiver = 0;
-        }
-    }
         break;
 
     case UnmapNotify:                                // window hidden
@@ -4013,6 +4443,14 @@ bool qt_try_modal(QWidget *widget, XEvent *event)
     case LeaveNotify:
     case ClientMessage:
         return false;
+#if !defined(QT_NO_XINPUT2)
+    case GenericEvent:
+        if (X11->use_xinput
+            && event->xcookie.extension == X11->xinput_opcode)
+            return false;
+        else
+            return true;
+#endif
     default:
         break;
     }
@@ -4051,10 +4489,38 @@ void QApplicationPrivate::openPopup(QWidget *popup)
         int r = XGrabKeyboard(dpy, popup->effectiveWinId(), false,
                               GrabModeAsync, GrabModeAsync, X11->time);
         if ((popupGrabOk = (r == GrabSuccess))) {
-            r = XGrabPointer(dpy, popup->effectiveWinId(), true,
-                             (ButtonPressMask | ButtonReleaseMask | ButtonMotionMask
-                              | EnterWindowMask | LeaveWindowMask | PointerMotionMask),
-                             GrabModeAsync, GrabModeAsync, XNone, XNone, X11->time);
+#if !defined(QT_NO_XINPUT2)
+            if (X11->use_xinput) {
+                XIEventMask xieventmask;
+                uchar bitmask[2] = { 0, 0 };
+
+                xieventmask.deviceid = X11->xiMasterDeviceId;
+                xieventmask.mask = bitmask;
+                xieventmask.mask_len = sizeof(bitmask);
+
+                XISetMask(bitmask, XI_ButtonPress);
+                XISetMask(bitmask, XI_ButtonRelease);
+                XISetMask(bitmask, XI_Motion);
+                XISetMask(bitmask, XI_Enter);
+                XISetMask(bitmask, XI_Leave);
+
+                r = XIGrabDevice(X11->display,
+                                 xieventmask.deviceid,
+                                 popup->effectiveWinId(),
+                                 X11->time,
+                                 XNone,
+                                 GrabModeAsync,
+                                 GrabModeAsync,
+                                 true,
+                                 &xieventmask);
+            } else
+#endif
+            {
+                r = XGrabPointer(dpy, popup->effectiveWinId(), true,
+                                 (ButtonPressMask | ButtonReleaseMask | ButtonMotionMask
+                                  | EnterWindowMask | LeaveWindowMask | PointerMotionMask),
+                                 GrabModeAsync, GrabModeAsync, XNone, XNone, X11->time);
+            }
             if (!(popupGrabOk = (r == GrabSuccess))) {
                 // transfer grab back to the keyboard grabber if any
                 if (QWidgetPrivate::keyboardGrabber != 0)
@@ -4102,10 +4568,16 @@ void QApplicationPrivate::closePopup(QWidget *popup)
                 replayPopupMouseEvent = true;
             }
             // transfer grab back to mouse grabber if any, otherwise release the grab
-            if (QWidgetPrivate::mouseGrabber != 0)
+            if (QWidgetPrivate::mouseGrabber != 0) {
                 QWidgetPrivate::mouseGrabber->grabMouse();
-            else
-                XUngrabPointer(dpy, X11->time);
+            } else {
+#if !defined(QT_NO_XINPUT2)
+                if (X11->use_xinput)
+                    XIUngrabDevice(X11->display, X11->xiMasterDeviceId, X11->time);
+                else
+#endif
+                    XUngrabPointer(dpy, X11->time);
+            }
 
             // transfer grab back to keyboard grabber if any, otherwise release the grab
             if (QWidgetPrivate::keyboardGrabber != 0)
@@ -4141,10 +4613,38 @@ void QApplicationPrivate::closePopup(QWidget *popup)
             int r = XGrabKeyboard(dpy, aw->effectiveWinId(), false,
                                   GrabModeAsync, GrabModeAsync, X11->time);
             if ((popupGrabOk = (r == GrabSuccess))) {
-                r = XGrabPointer(dpy, aw->effectiveWinId(), true,
-                                 (ButtonPressMask | ButtonReleaseMask | ButtonMotionMask
-                                  | EnterWindowMask | LeaveWindowMask | PointerMotionMask),
-                                 GrabModeAsync, GrabModeAsync, XNone, XNone, X11->time);
+#if !defined(QT_NO_XINPUT2)
+                if (X11->use_xinput) {
+                    XIEventMask xieventmask;
+                    uchar bitmask[2] = { 0, 0 };
+
+                    xieventmask.deviceid = X11->xiMasterDeviceId;
+                    xieventmask.mask = bitmask;
+                    xieventmask.mask_len = sizeof(bitmask);
+
+                    XISetMask(bitmask, XI_ButtonPress);
+                    XISetMask(bitmask, XI_ButtonRelease);
+                    XISetMask(bitmask, XI_Motion);
+                    XISetMask(bitmask, XI_Enter);
+                    XISetMask(bitmask, XI_Leave);
+
+                    r = XIGrabDevice(X11->display,
+                                     xieventmask.deviceid,
+                                     aw->effectiveWinId(),
+                                     X11->time,
+                                     XNone,
+                                     GrabModeAsync,
+                                     GrabModeAsync,
+                                     true,
+                                     &xieventmask);
+                } else
+#endif
+                {
+                    r = XGrabPointer(dpy, aw->effectiveWinId(), true,
+                                     (ButtonPressMask | ButtonReleaseMask | ButtonMotionMask
+                                      | EnterWindowMask | LeaveWindowMask | PointerMotionMask),
+                                     GrabModeAsync, GrabModeAsync, XNone, XNone, X11->time);
+                }
                 if (!(popupGrabOk = (r == GrabSuccess))) {
                     // transfer grab back to keyboard grabber
                     if (QWidgetPrivate::keyboardGrabber != 0)
@@ -4202,16 +4702,28 @@ bool QETWidget::translateMouseEvent(const XEvent *event)
         Q_ASSERT(internalWinId());
 
     Q_D(QWidget);
-    QEvent::Type type;                                // event parameters
-    QPoint pos;
-    QPoint globalPos;
-    Qt::MouseButton button = Qt::NoButton;
-    Qt::MouseButtons buttons;
-    Qt::KeyboardModifiers modifiers;
-    XEvent nextEvent;
 
     if (qt_sm_blockUserInput) // block user interaction during session management
         return true;
+
+#if !defined(QT_NO_XINPUT2)
+    if (X11->use_xinput
+        && event->type == GenericEvent
+        && event->xcookie.extension == X11->xinput_opcode) {
+        // translate XI2 events differently
+        return translateXI2Event((XIEvent *) event->xcookie.data);
+    }
+#endif
+
+    // event parameters
+    int xtype = event->type;
+    Window window = event->xany.window;
+    QEvent::Type type = QEvent::None;
+    QPoint pos;
+    QPoint globalPos;
+    Qt::MouseButton button = Qt::NoButton;
+    Qt::MouseButtons buttons = 0;
+    Qt::KeyboardModifiers modifiers = 0;
 
     if (event->type == MotionNotify) { // mouse move
         if (event->xmotion.root != RootWindow(X11->display, x11Info().screen()) &&
@@ -4220,6 +4732,7 @@ bool QETWidget::translateMouseEvent(const XEvent *event)
 
         XMotionEvent lastMotion = event->xmotion;
         while(XPending(X11->display))  { // compress mouse moves
+            XEvent nextEvent;
             XNextEvent(X11->display, &nextEvent);
             if (nextEvent.type == ConfigureNotify
                 || nextEvent.type == PropertyNotify
@@ -4276,6 +4789,7 @@ bool QETWidget::translateMouseEvent(const XEvent *event)
         if (qt_button_down)
             return true;
     } else {                                        // button press or release
+        type = event->type == ButtonPress ? QEvent::MouseButtonPress : QEvent::MouseButtonRelease;
         pos.rx() = event->xbutton.x;
         pos.ry() = event->xbutton.y;
         pos = d->mapFromWS(pos);
@@ -4325,67 +4839,79 @@ bool QETWidget::translateMouseEvent(const XEvent *event)
         case 8: button = Qt::XButton1; break;
         case 9: button = Qt::XButton2; break;
         }
-        if (event->type == ButtonPress) {        // mouse button pressed
-            buttons |= button;
-#if defined(Q_OS_IRIX) && !defined(QT_NO_TABLET)
-            QTabletDeviceDataList *tablets = qt_tablet_devices();
-            for (int i = 0; i < tablets->size(); ++i) {
-                QTabletDeviceData &tab = tablets->operator[](i);
-                XEvent myEv;
-                if (XCheckTypedEvent(X11->display, tab.xinput_button_press, &myEv)) {
-                        if (translateXinputEvent(&myEv, &tab)) {
-                            //Spontaneous event sent.  Check if we need to continue.
-                            if (qt_tabletChokeMouse) {
-                                qt_tabletChokeMouse = false;
-                                return false;
-                            }
-                        }
-                }
-            }
-#endif
-            if (!qt_button_down) {
-                qt_button_down = childAt(pos);        //magic for masked widgets
-                if (!qt_button_down)
-                    qt_button_down = this;
-            }
-            if (mouseActWindow == event->xbutton.window &&
-                mouseButtonPressed == button &&
-                (long)event->xbutton.time -(long)mouseButtonPressTime
-                < QApplication::doubleClickInterval() &&
-                qAbs(event->xbutton.x - mouseXPos) < QT_GUI_DOUBLE_CLICK_RADIUS &&
-                qAbs(event->xbutton.y - mouseYPos) < QT_GUI_DOUBLE_CLICK_RADIUS) {
-                type = QEvent::MouseButtonDblClick;
-                mouseButtonPressTime -= 2000;        // no double-click next time
-            } else {
-                type = QEvent::MouseButtonPress;
-                mouseButtonPressTime = event->xbutton.time;
-            }
-            mouseButtonPressed = button;        // save event params for
-            mouseXPos = event->xbutton.x;                // future double click tests
-            mouseYPos = event->xbutton.y;
-            mouseGlobalXPos = globalPos.x();
-            mouseGlobalYPos = globalPos.y();
-        } else {                                // mouse button released
-            buttons &= ~button;
-#if defined(Q_OS_IRIX) && !defined(QT_NO_TABLET)
-            QTabletDeviceDataList *tablets = qt_tablet_devices();
-            for (int i = 0; i < tablets->size(); ++i) {
-                QTabletDeviceData &tab = tablets->operator[](i);
-                XEvent myEv;
-                if (XCheckTypedEvent(X11->display, tab.xinput_button_press, &myEv)) {
-                        if (translateXinputEvent(&myEv, &tab)) {
-                            //Spontaneous event sent.  Check if we need to continue.
-                            if (qt_tabletChokeMouse) {
-                                qt_tabletChokeMouse = false;
-                                return false;
-                            }
-                        }
-                }
-            }
-#endif
-            type = QEvent::MouseButtonRelease;
-        }
     }
+
+    return sendMouseEvent(xtype, window, type, pos, globalPos, button, buttons, modifiers);
+}
+
+bool QETWidget::sendMouseEvent(int xtype,
+                               Window window,
+                               QEvent::Type type,
+                               QPoint pos,
+                               QPoint globalPos,
+                               Qt::MouseButton button,
+                               Qt::MouseButtons buttons,
+                               Qt::KeyboardModifiers modifiers)
+{
+    if (xtype == ButtonPress) {        // mouse button pressed
+        buttons |= button;
+#if defined(Q_OS_IRIX) && !defined(QT_NO_TABLET)
+        QTabletDeviceDataList *tablets = qt_tablet_devices();
+        for (int i = 0; i < tablets->size(); ++i) {
+            QTabletDeviceData &tab = tablets->operator[](i);
+            XEvent myEv;
+            if (XCheckTypedEvent(X11->display, tab.xinput_button_press, &myEv)) {
+                    if (translateXinputEvent(&myEv, &tab)) {
+                        //Spontaneous event sent.  Check if we need to continue.
+                        if (qt_tabletChokeMouse) {
+                            qt_tabletChokeMouse = false;
+                            return false;
+                        }
+                    }
+            }
+        }
+#endif
+        if (!qt_button_down) {
+            qt_button_down = childAt(pos);        //magic for masked widgets
+            if (!qt_button_down)
+                qt_button_down = this;
+        }
+        if (mouseActWindow == window &&
+            mouseButtonPressed == button &&
+            (long)X11->time -(long)mouseButtonPressTime
+            < QApplication::doubleClickInterval() &&
+            qAbs(globalPos.x() - mouseGlobalXPos) < QT_GUI_DOUBLE_CLICK_RADIUS &&
+            qAbs(globalPos.y() - mouseGlobalYPos) < QT_GUI_DOUBLE_CLICK_RADIUS) {
+            type = QEvent::MouseButtonDblClick;
+            mouseButtonPressTime -= 2000;        // no double-click next time
+        } else {
+            mouseButtonPressTime = X11->time;
+        }
+        // save params for future double-click tests
+        mouseButtonPressed = button;
+        mouseGlobalXPos = globalPos.x();
+        mouseGlobalYPos = globalPos.y();
+    } else if (xtype == ButtonRelease) {
+        // mouse button released
+        buttons &= ~button;
+#if defined(Q_OS_IRIX) && !defined(QT_NO_TABLET)
+        QTabletDeviceDataList *tablets = qt_tablet_devices();
+        for (int i = 0; i < tablets->size(); ++i) {
+            QTabletDeviceData &tab = tablets->operator[](i);
+            XEvent myEv;
+            if (XCheckTypedEvent(X11->display, tab.xinput_button_press, &myEv)) {
+                    if (translateXinputEvent(&myEv, &tab)) {
+                        //Spontaneous event sent.  Check if we need to continue.
+                        if (qt_tabletChokeMouse) {
+                            qt_tabletChokeMouse = false;
+                            return false;
+                        }
+                    }
+            }
+        }
+#endif
+    }
+
     mouseActWindow = effectiveWinId();                        // save some event params
     mouseButtonState = buttons;
     if (type == 0)                                // don't send event
@@ -4395,7 +4921,7 @@ bool QETWidget::translateMouseEvent(const XEvent *event)
         QWidget *activePopupWidget = qApp->activePopupWidget();
         QWidget *popup = qApp->activePopupWidget();
         if (popup != this) {
-            if (event->type == LeaveNotify)
+            if (xtype == LeaveNotify)
                 return false;
             if ((windowType() == Qt::Popup) && rect().contains(pos) && 0)
                 popup = this;
@@ -4515,6 +5041,412 @@ bool QETWidget::translateMouseEvent(const XEvent *event)
     return true;
 }
 
+#if !defined(QT_NO_XINPUT2)
+
+static Atom mapXI2ButtonToButtonLabel(int button)
+{
+    Atom buttonatom = XNone;
+
+    if (X11->xibuttonclassinfo) {
+        // map buttons based on the labeling
+        buttonatom = X11->xibuttonclassinfo->labels[button - 1];
+    }
+
+    // if there is no label, fall back to how we handle core pointer buttons
+    if (!buttonatom) {
+        switch (button) {
+        case Button1: buttonatom = ATOM(ButtonLeft); break;
+        case Button2: buttonatom = ATOM(ButtonMiddle); break;
+        case Button3: buttonatom = ATOM(ButtonRight); break;
+        case       4: buttonatom = ATOM(ButtonWheelUp); break;
+        case       5: buttonatom = ATOM(ButtonWheelDown); break;
+        case       6: buttonatom = ATOM(ButtonHorizWheelLeft); break;
+        case       7: buttonatom = ATOM(ButtonHorizWheelRight); break;
+        }
+    }
+
+    return buttonatom;
+}
+
+static Qt::MouseButton mapButtonLabelToQtButton(Atom buttonatom, int button)
+{
+    Qt::MouseButton qtbutton = Qt::NoButton;
+    if (buttonatom == ATOM(ButtonLeft)) {
+        qtbutton = Qt::LeftButton;
+    } else if (buttonatom == ATOM(ButtonMiddle)) {
+        qtbutton = Qt::MidButton;
+    } else if (buttonatom == ATOM(ButtonRight)) {
+        qtbutton = Qt::RightButton;
+    } else if (buttonatom == XNone) {
+        // ### TODO: find a better way to map the extra buttons
+        switch (button) {
+        case 8: qtbutton = Qt::XButton1; break;
+        case 9: qtbutton = Qt::XButton2; break;
+        }
+    }
+    return qtbutton;
+}
+
+static Qt::MouseButton mapXI2ButtonToQtButton(int button)
+{
+    return mapButtonLabelToQtButton(mapXI2ButtonToButtonLabel(button), button);
+}
+
+static Qt::MouseButtons translateXI2MouseButtons(XIButtonState *state)
+{
+    Qt::MouseButtons returnValue = 0;
+    for (int b = 0; b < state->mask_len; ++b) {
+        for (int t = 0; t < 8; ++t) {
+            int button = (b << 3) + t;
+            bool down = (state->mask[b] & (1 << t)) != 0;
+            if (!down)
+                continue;
+            Qt::MouseButton qtbutton = mapXI2ButtonToQtButton(button);
+            if (qtbutton != Qt::NoButton)
+                returnValue |= qtbutton;
+        }
+    }
+    return returnValue;
+}
+
+bool QETWidget::translateXI2Event(const XIEvent *xievent)
+{
+    Q_D(QWidget);
+    static int width = 0;
+    static int height = 0;
+    if (width == 0 || height == 0) {
+        width = DisplayWidth(X11->display, 0);
+        height = DisplayHeight(X11->display, 0);
+    }
+
+    if (xievent->evtype == XI_Motion) {
+        XIDeviceEvent *motionevent = (XIDeviceEvent *) xievent;
+
+        XIDeviceEvent lastMotion = *motionevent;
+        int index = xiFindActiveDevice(motionevent->deviceid);
+        bool isTouch = (index == -1) ? false : X11->xiIsTouch[index];
+
+        Qt::MouseButtons buttons;
+        Qt::KeyboardModifiers modifiers;
+        Qt::MouseButtons lastButtons;
+        uint activeTouchPoints = 0;
+        Qt::KeyboardModifiers lastModifiers = X11->translateModifiers(lastMotion.mods.effective);
+        if (!isTouch) { // if mouse
+            lastButtons = translateXI2MouseButtons(&lastMotion.buttons);
+        } else { // else touch
+            // get a list of currently active touch points
+            QList<QTouchEvent::TouchPoint> touchPoints = qApp->d_func()->appAllTouchPoints;
+            for (int i = 0; i < touchPoints.size(); ++i) {
+                if (touchPoints.at(i).state() != Qt::TouchPointReleased)
+                    activeTouchPoints |= 1 << i;
+            }
+        }
+
+        while (XPending(X11->display)) {
+            XEvent ev;
+            XNextEvent(X11->display, &ev);
+
+            // process certain types of events that often come together with motion events
+            if (ev.type == ConfigureNotify
+                || ev.type == PropertyNotify
+                || ev.type == Expose
+                || ev.type == GraphicsExpose
+                || ev.type == NoExpose
+                || ev.type == KeymapNotify
+                || (ev.type == GenericEvent
+                    && ev.xcookie.extension == X11->xinput_opcode
+                    && (ev.xcookie.evtype == XI_Enter || ev.xcookie.evtype == XI_Leave)
+                    // ### XI_ButtonPress || XI_ButtonRelease
+                    && qt_button_down == this)
+                || (ev.type == ClientMessage
+                    && (ev.xclient.message_type == ATOM(_QT_SCROLL_DONE) ||
+                    (ev.xclient.message_type == ATOM(WM_PROTOCOLS) &&
+                     (Atom)ev.xclient.data.l[0] == ATOM(_NET_WM_SYNC_REQUEST))))) {
+                qApp->x11ProcessEvent(&ev);
+                continue;
+            } else if (ev.type == GenericEvent
+                       && ev.xcookie.extension == X11->xinput_opcode
+                       && ev.xcookie.evtype == XI_Motion
+                       && XGetEventData(X11->display, &ev.xcookie)) {
+                // this is an XI_Motion event...
+                motionevent = (XIDeviceEvent *) ev.xcookie.data;
+
+                modifiers = X11->translateModifiers(motionevent->mods.effective);
+                int index = xiFindActiveDevice(motionevent->deviceid);
+                if (index == -1) {
+                    // Can not find device in our Active list; likely from multiple master pointers...
+                    XPutBackEvent(X11->display, &ev);
+                    XFreeEventData(X11->display, &ev.xcookie);
+                    break;
+                }
+                uint active = 0;
+                bool isTouch = X11->xiIsTouch[index];
+                if (isTouch)
+                {
+                    for (int i = 0; i < X11->xiDeviceInfo[index].num_classes; ++i) {
+                        XIAnyClassInfo *classinfo = X11->xiDeviceInfo[index].classes[i];
+                        if (classinfo->type == XIValuatorClass) {
+                            XIValuatorClassInfo *valuatorclassinfo = reinterpret_cast<XIValuatorClassInfo *>(classinfo);
+                            int n = valuatorclassinfo->number;
+
+                            if (!XIMaskIsSet(motionevent->valuators.mask, n))
+                                continue;
+
+                            if (valuatorclassinfo->label == ATOM(AbsMTTrackingID)) {
+                                int id = motionevent->valuators.values[n];
+                                active |= 1 << id;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    buttons = translateXI2MouseButtons(&motionevent->buttons);
+                }
+
+                // .. can we compress it?
+                if (motionevent->event == lastMotion.event
+                    && modifiers == lastModifiers
+                    && (isTouch || buttons == lastButtons)
+                    && (!isTouch || activeTouchPoints == active)) {
+                    // send event through filters
+                    if (!qt_x11EventFilter(&ev) && !x11Event(&ev)) {
+                        // compress this motion event
+                        lastMotion = *motionevent;
+                        if (isTouch)
+                            lastButtons = buttons;
+                        lastModifiers = modifiers;
+                        XFreeEventData(X11->display, &ev.xcookie);
+                        continue;
+                    } else {
+                        // filtered
+                        XFreeEventData(X11->display, &ev.xcookie);
+                        break;
+                    }
+                }
+
+                // different state or different window, put this event back and stop compression
+                XPutBackEvent(X11->display, &ev);
+                XFreeEventData(X11->display, &ev.xcookie);
+                break;
+            }
+
+            // not the right type of event, stop compression
+            XPutBackEvent(X11->display, &ev);
+            break;
+        }
+    }
+
+    bool isTouch = false;
+    if (xievent->evtype == XI_ButtonPress
+        || xievent->evtype == XI_ButtonRelease
+        || xievent->evtype == XI_Motion) {
+        const XIDeviceEvent *xideviceevent = reinterpret_cast<const XIDeviceEvent *>(xievent);
+        int index = xiFindActiveDevice(xideviceevent->deviceid);
+        isTouch = (index == -1) ? false : X11->xiIsTouch[index];
+        if (isTouch) {
+            QList<QTouchEvent::TouchPoint> touchPoints = qApp->d_func()->appAllTouchPoints;
+            if (touchPoints.count() != 10) { //X11->xiMaxContacts) {
+                // initial event, allocate space for all (potential) touch points
+                touchPoints.reserve(10);
+                for (int i = 0; i < 10; ++i)
+                    touchPoints << QTouchEvent::TouchPoint(i);
+            }
+            qreal x, y, nx, ny, w = 0.0, h = 0.0, p = -1.0;
+            x = y = nx = ny = 0.0;
+            int id;
+            uint active = 0;
+            for (int i = 0; i < X11->xiDeviceInfo[index].num_classes; ++i) {
+                XIAnyClassInfo *classinfo = X11->xiDeviceInfo[index].classes[i];
+                if (classinfo->type == XIValuatorClass) {
+                    XIValuatorClassInfo *valuatorclassinfo = reinterpret_cast<XIValuatorClassInfo *>(classinfo);
+                    int n = valuatorclassinfo->number;
+
+                    if (!XIMaskIsSet(xideviceevent->valuators.mask, n))
+                        continue;
+
+                    if (valuatorclassinfo->label == ATOM(AbsMTPositionX)) {
+                        x = xideviceevent->valuators.values[n];
+                        nx = (x - valuatorclassinfo->min) / (valuatorclassinfo->max - valuatorclassinfo->min);
+                    } else if (valuatorclassinfo->label == ATOM(AbsMTPositionY)) {
+                        y = xideviceevent->valuators.values[n];
+                        ny = (y - valuatorclassinfo->min) / (valuatorclassinfo->max - valuatorclassinfo->min);
+                    } else if (valuatorclassinfo->label == ATOM(AbsMTTouchMajor)) {
+                        w = xideviceevent->valuators.values[n];
+                    } else if (valuatorclassinfo->label == ATOM(AbsMTTouchMinor)) {
+                        h = xideviceevent->valuators.values[n];
+                    } else if (valuatorclassinfo->label == ATOM(AbsMTPressure)) {
+                        p = (xideviceevent->valuators.values[n] - valuatorclassinfo->min) / (valuatorclassinfo->max - valuatorclassinfo->min);
+                    } else if (valuatorclassinfo->label == ATOM(AbsMTTrackingID)) {
+                        id = xideviceevent->valuators.values[n];
+                        active |= 1 << id;
+                        QTouchEvent::TouchPoint &touchPoint = touchPoints[id];
+
+                        Qt::TouchPointStates newstate;
+                        if (touchPoint.state() == Qt::TouchPointReleased) {
+                            newstate |= Qt::TouchPointPressed;
+                        } else {
+                            if (touchPoint.screenPos() != QPoint(x, y))
+                                newstate |= Qt::TouchPointMoved;
+                            else
+                                newstate |= Qt::TouchPointStationary;
+                        }
+
+                        if (id == 0)
+                            newstate |= Qt::TouchPointPrimary;
+
+                        touchPoint.setState(newstate);
+                        if (w != 0.0 && h != 0.0)
+                            touchPoint.setScreenRect(QRectF((nx * width) - w/2, (ny * height) - h/2, w, h));
+                        else
+                            touchPoint.setScreenPos(QPoint(nx * width, ny * height));
+                        touchPoint.setNormalizedPos(QPointF(nx, ny));
+                        touchPoint.setPressure(p);
+                    }
+                }
+            }
+
+            // mark previously-active-but-now-inactive touch points as released
+            for (int i = 0; i < touchPoints.count(); ++i) {
+                if (!(active & (1 << i)) && touchPoints.at(i).state() != Qt::TouchPointReleased) {
+                    Qt::TouchPointStates newstate = Qt::TouchPointReleased;
+
+                    if (touchPoints.at(i).id() == 0)
+                        newstate |= Qt::TouchPointPrimary;
+
+                    touchPoints[i].setState(newstate);
+                }
+            }
+
+            if (xideviceevent->evtype == XI_ButtonRelease) {
+                // final event, forget touch state
+                qApp->d_func()->appAllTouchPoints.clear();
+            } else {
+                // save current state so that we have something to reuse later
+                qApp->d_func()->appAllTouchPoints = touchPoints;
+            }
+
+            QApplicationPrivate::translateRawTouchEvent(this, QTouchEvent::TouchScreen, touchPoints);
+        }
+    }
+
+    // event parameters
+    int xtype = 0;
+    Window window = XNone;
+    QEvent::Type type = QEvent::None;
+    QPoint pos;
+    QPoint globalPos;
+    Qt::MouseButton button = Qt::NoButton;
+    Qt::MouseButtons buttons = 0;
+    Qt::KeyboardModifiers modifiers = 0;
+
+    if (xievent->evtype == XI_Motion) {
+        XIDeviceEvent *motionevent = (XIDeviceEvent *) xievent;
+
+        if (X11->xiMasterIndex == -1 || motionevent->deviceid != X11->xiMasterDeviceId)
+            return sendMouseEvent(xtype, window, type, pos, globalPos, button, buttons, modifiers);
+
+        XIDeviceEvent lastMotion = *motionevent;
+        Qt::MouseButtons lastButtons = translateXI2MouseButtons(&lastMotion.buttons);
+        Qt::KeyboardModifiers lastModifiers = X11->translateModifiers(lastMotion.mods.effective);
+
+        xtype = MotionNotify;
+        window = lastMotion.event;
+        type = QEvent::MouseMove;
+        pos.rx() = lastMotion.event_x;
+        pos.ry() = lastMotion.event_y;
+        pos = d->mapFromWS(pos);
+        globalPos.rx() = lastMotion.root_x;
+        globalPos.ry() = lastMotion.root_y;
+        buttons = lastButtons;
+        modifiers = lastModifiers;
+        if (qt_button_down && !buttons)
+            qt_button_down = 0;
+    } else if (xievent->evtype == XI_Enter || xievent->evtype == XI_Leave) {
+        XIEnterEvent *enterevent = (XIEnterEvent *) xievent;
+
+        if (X11->xiMasterIndex == -1 || enterevent->deviceid != X11->xiMasterDeviceId)
+            return sendMouseEvent(xtype, window, type, pos, globalPos, button, buttons, modifiers);
+
+        xtype = enterevent->evtype == XI_Enter ? EnterNotify : LeaveNotify;
+        window = enterevent->event;
+        type = QEvent::MouseMove;
+        pos.rx() = enterevent->event_x;
+        pos.ry() = enterevent->event_y;
+        pos = d->mapFromWS(pos);
+        globalPos.rx() = enterevent->root_x;
+        globalPos.ry() = enterevent->root_y;
+        buttons = translateXI2MouseButtons(&enterevent->buttons);
+        modifiers = X11->translateModifiers(enterevent->mods.effective);
+        if (qt_button_down && !buttons)
+            qt_button_down = 0;
+        if (qt_button_down)
+            return true;
+    } else if (xievent->evtype == XI_ButtonPress || xievent->evtype == XI_ButtonRelease){
+        // XI_ButtonPress or XI_ButtonRelease
+        XIDeviceEvent *deviceevent = (XIDeviceEvent *) xievent;
+
+        if (X11->xiMasterIndex == -1 || deviceevent->deviceid != X11->xiMasterDeviceId)
+            return sendMouseEvent(xtype, window, type, pos, globalPos, button, buttons, modifiers);
+
+        xtype = deviceevent->evtype == XI_ButtonPress ? ButtonPress : ButtonRelease;
+        window = deviceevent->event;
+        type = deviceevent->evtype == XI_ButtonPress ?  QEvent::MouseButtonPress : QEvent::MouseButtonRelease;
+        pos.rx() = deviceevent->event_x;
+        pos.ry() = deviceevent->event_y;
+        pos = d->mapFromWS(pos);
+        globalPos.rx() = deviceevent->root_x;
+        globalPos.ry() = deviceevent->root_y;
+        buttons = translateXI2MouseButtons(&deviceevent->buttons);
+        modifiers = X11->translateModifiers(deviceevent->mods.effective);
+
+        // map the device button to a button label
+        Atom buttonatom = mapXI2ButtonToButtonLabel(deviceevent->detail);
+        button = mapButtonLabelToQtButton(buttonatom, deviceevent->detail);
+
+        if (button == Qt::NoButton
+            && (buttonatom == ATOM(ButtonWheelUp)
+                || buttonatom == ATOM(ButtonWheelDown)
+                || buttonatom == ATOM(ButtonHorizWheelLeft)
+                || buttonatom == ATOM(ButtonHorizWheelRight))) {
+            // mouse wheel, we are only interested in the presses for these buttons
+
+            if (deviceevent->evtype == XI_ButtonPress) {
+                // compress wheel events (the X Server will simply
+                // send a button press for each single notch,
+                // regardless whether the application can catch up
+                // or not)
+                int delta = 1;
+
+                XEvent ev;
+                while (XCheckIfEvent(X11->display, &ev, qt_XI_Wheel_scanner, (XPointer) deviceevent))
+                    delta++;
+
+                // the delta is defined as multiples of
+                // WHEEL_DELTA, which is set to 120. Future wheels
+                // may offer a finer-resolution. A positive delta
+                // indicates forward rotation, a negative one
+                // backward rotation respectively.
+                delta *= 120 * ((buttonatom == ATOM(ButtonWheelUp) || buttonatom == ATOM(ButtonHorizWheelLeft)) ? 1 : -1);
+                bool hor = (((buttonatom == ATOM(ButtonWheelUp)
+                              || buttonatom == ATOM(ButtonWheelDown))
+                             && (modifiers & Qt::AltModifier))
+                            || (buttonatom == ATOM(ButtonHorizWheelLeft)
+                                || buttonatom == ATOM(ButtonHorizWheelRight)));
+                translateWheelEvent(globalPos.x(), globalPos.y(), delta, buttons,
+                                    modifiers, (hor) ? Qt::Horizontal: Qt::Vertical);
+            }
+            return true;
+        }
+    } else {
+        // unreachable
+        qFatal("Qt: Internal Error: Unknown XI2 event passed to translateXI2Event()");
+    }
+
+    return sendMouseEvent(xtype, window, type, pos, globalPos, button, buttons, modifiers);
+}
+
+#endif // !QT_NO_XINPUT2
 
 //
 // Wheel event translation

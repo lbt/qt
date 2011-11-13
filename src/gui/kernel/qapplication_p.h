@@ -636,6 +636,10 @@ public:
     bool useTranslucentEGLSurfaces;
 #endif
 
+#if defined(Q_WS_X11) && !defined(QT_NO_XINPUT2)
+    QList<QTouchEvent::TouchPoint> appAllTouchPoints;
+#endif
+
 private:
 #ifdef Q_WS_QWS
     QMap<const QScreen*, QRect> maxWindowRects;

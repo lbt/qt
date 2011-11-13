@@ -140,9 +140,10 @@ symbian {
 unix:x11 {
 	INCLUDEPATH += ../3rdparty/xorg
 	HEADERS += \
+                kernel/qt_x11_p.h \
 		kernel/qx11embed_x11.h \
 		kernel/qx11info_x11.h \
-        kernel/qkde_p.h
+                kernel/qkde_p.h
 
 	SOURCES += \
 		kernel/qapplication_x11.cpp \
