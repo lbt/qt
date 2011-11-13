@@ -50,6 +50,11 @@
 #endif
 #include <sys/stat.h>
 
+// TMPDIR sometimes points to /tmp and sometimes to /var/tmp
+// To guarantee native platform key generation for QSharedMemory and friends,
+// we must hard code the temp path to /var/tmp here.
+#define QT_UNIX_TEMP_PATH_OVERRIDE "/var/tmp"
+
 #if defined(QT_USE_XOPEN_LFS_EXTENSIONS) && defined(QT_LARGEFILE_SUPPORT)
 
 #define QT_STATBUF              struct stat64
