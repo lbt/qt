@@ -505,6 +505,22 @@ void QDeclarativeFlickablePrivate::updateBeginningEnd()
 */
 
 /*!
+    \qmlsignal Flickable::onDragStarted()
+
+    This handler is called when the view starts to be dragged due to user
+    interaction.
+*/
+
+/*!
+    \qmlsignal Flickable::onDragEnded()
+
+    This handler is called when the user stops dragging the view.
+
+    If the velocity of the drag is suffient at the time the
+    touch/mouse button is released then a flick will start.
+*/
+
+/*!
     \qmlproperty real Flickable::visibleArea.xPosition
     \qmlproperty real Flickable::visibleArea.widthRatio
     \qmlproperty real Flickable::visibleArea.yPosition
@@ -865,6 +881,7 @@ void QDeclarativeFlickablePrivate::handleMouseMoveEvent(QGraphicsSceneMouseEvent
     }
 
     if (hMoved || vMoved) {
+        draggingStarting();
         q->movementStarting();
         q->viewportMoved();
     }
@@ -891,14 +908,18 @@ void QDeclarativeFlickablePrivate::handleMouseReleaseEvent(QGraphicsSceneMouseEv
     stealMouse = false;
     q->setKeepMouseGrab(false);
     pressed = false;
-    if (!lastPosTime.isValid())
-        return;
 
     // if we drag then pause before release we should not cause a flick.
     qint64 elapsed = QDeclarativeItemPrivate::elapsed(lastPosTime);
 
     vData.updateVelocity();
     hData.updateVelocity();
+
+    draggingEnding();
+
+    if (!lastPosTime.isValid())
+        return;
+
     vTime = timeline.time();
 
     qreal velocity = elapsed < 100 ? vData.velocity : 0;
@@ -1496,6 +1517,7 @@ bool QDeclarativeFlickable::sceneEvent(QEvent *event)
             // if our mouse grab has been removed (probably by another Flickable),
             // fix our state
             d->pressed = false;
+            d->draggingEnding();
             d->stealMouse = false;
             setKeepMouseGrab(false);
         }
@@ -1662,6 +1684,68 @@ bool QDeclarativeFlickable::isFlickingVertically() const
 {
     Q_D(const QDeclarativeFlickable);
     return d->vData.flicking;
+}
+
+/*!
+    \qmlproperty bool Flickable::dragging
+    \qmlproperty bool Flickable::draggingHorizontally
+    \qmlproperty bool Flickable::draggingVertically
+
+    These properties describe whether the view is currently moving horizontally,
+    vertically or in either direction, due to the user dragging the view.
+*/
+bool QDeclarativeFlickable::isDragging() const
+{
+    Q_D(const QDeclarativeFlickable);
+    return d->hData.dragging ||  d->vData.dragging;
+}
+
+bool QDeclarativeFlickable::isDraggingHorizontally() const
+{
+    Q_D(const QDeclarativeFlickable);
+    return d->hData.dragging;
+}
+
+bool QDeclarativeFlickable::isDraggingVertically() const
+{
+    Q_D(const QDeclarativeFlickable);
+    return d->vData.dragging;
+}
+
+void QDeclarativeFlickablePrivate::draggingStarting()
+{
+    Q_Q(QDeclarativeFlickable);
+    bool wasDragging = hData.dragging || vData.dragging;
+    if (hMoved && !hData.dragging) {
+        hData.dragging = true;
+        emit q->draggingHorizontallyChanged();
+    }
+    if (vMoved && !vData.dragging) {
+        vData.dragging = true;
+        emit q->draggingVerticallyChanged();
+    }
+    if (!wasDragging && (hData.dragging || vData.dragging)) {
+        emit q->draggingChanged();
+        emit q->dragStarted();
+    }
+}
+
+void QDeclarativeFlickablePrivate::draggingEnding()
+{
+    Q_Q(QDeclarativeFlickable);
+    bool wasDragging = hData.dragging || vData.dragging;
+    if (hData.dragging) {
+        hData.dragging = false;
+        emit q->draggingHorizontallyChanged();
+    }
+    if (vData.dragging) {
+        vData.dragging = false;
+        emit q->draggingVerticallyChanged();
+    }
+    if (wasDragging && !hData.dragging && !vData.dragging) {
+        emit q->draggingChanged();
+        emit q->dragEnded();
+    }
 }
 
 /*!

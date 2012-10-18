@@ -200,6 +200,9 @@ void QDeclarativeItemModule::defineModule()
     qmlRegisterRevision<QDeclarativeImplicitSizePaintedItem,1>("QtQuick",1,1);
     qmlRegisterUncreatableType<QDeclarativeLayoutMirroringAttached>("QtQuick",1,1,"LayoutMirroring", QDeclarativeLayoutMirroringAttached::tr("LayoutMirroring is only available via attached properties"));
 
+    // QtQuick 1.2 items
+    qmlRegisterType<QDeclarativeFlickable,2>("QtQuick",1,2,"Flickable");
+
 #ifndef QT_NO_IMPORT_QT47_QML
 #ifdef QT_NO_MOVIE
     qmlRegisterTypeNotAvailable("Qt",4,7,"AnimatedImage",

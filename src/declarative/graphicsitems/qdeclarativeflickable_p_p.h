@@ -99,7 +99,7 @@ public:
     struct AxisData {
         AxisData(QDeclarativeFlickablePrivate *fp, void (QDeclarativeFlickablePrivate::*func)(qreal))
             : move(fp, func), viewSize(-1), smoothVelocity(fp), atEnd(false), atBeginning(true)
-            , fixingUp(false), inOvershoot(false), moving(false), flicking(false)
+            , fixingUp(false), inOvershoot(false), moving(false), flicking(false), dragging(false)
         {}
 
         void reset() {
@@ -128,6 +128,7 @@ public:
         bool inOvershoot : 1;
         bool moving : 1;
         bool flicking : 1;
+        bool dragging : 1;
     };
 
     void flickX(qreal velocity);
@@ -151,6 +152,9 @@ public:
     qreal overShootDistance(qreal size);
 
     void itemGeometryChanged(QDeclarativeItem *, const QRectF &, const QRectF &);
+
+    void draggingStarting();
+    void draggingEnding();
 
 public:
     QDeclarativeItem *contentItem;
