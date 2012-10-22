@@ -202,7 +202,7 @@ public:
         if (q->isComponentComplete()) {
             clear();
             updateGrid();
-            setPosition(0);
+            setPosition(contentStartOffset());
             q->refill();
             updateCurrent(currentIndex);
         }
@@ -248,11 +248,11 @@ public:
     }
 
     qreal startPosition() const {
-        return isRightToLeftTopToBottom() ? -lastPosition()+1 : originPosition();
+        return isRightToLeftTopToBottom() ? -lastPosition() : originPosition();
     }
 
     qreal endPosition() const {
-        return isRightToLeftTopToBottom() ? -originPosition()+1 : lastPosition();
+        return isRightToLeftTopToBottom() ? -originPosition() : lastPosition();
 
     }
 
@@ -408,6 +408,25 @@ public:
                        : header->item->width();
     }
 
+    qreal footerSize() const {
+        if (!footer)
+            return 0.0;
+
+        return flow == QDeclarativeGridView::LeftToRight
+                       ? footer->item->height()
+                       : footer->item->width();
+    }
+
+    void updateViewport() {
+        Q_Q(QDeclarativeGridView);
+        qreal extra = headerSize() + footerSize();
+        qreal contentSize = isValid() ? (endPosition() - startPosition() + 1) : 0.0;
+        if (flow == QDeclarativeGridView::LeftToRight) {
+            q->setContentHeight(contentSize + extra);
+        } else {
+            q->setContentWidth(contentSize + extra);
+        }
+    }
 
     virtual void itemGeometryChanged(QDeclarativeItem *item, const QRectF &newGeometry, const QRectF &oldGeometry) {
         Q_Q(const QDeclarativeGridView);
@@ -426,6 +445,28 @@ public:
             if (footer)
                 updateFooter();
         }
+    }
+
+    void markExtentsDirty() {
+        if (flow == QDeclarativeGridView::LeftToRight)
+            vData.markExtentsDirty();
+        else
+            hData.markExtentsDirty();
+    }
+
+    qreal contentStartOffset() const {
+        Q_Q(const QDeclarativeGridView);
+        qreal pos = 0;
+        if (flow == QDeclarativeGridView::LeftToRight) {
+            pos = -vData.startMargin;
+        } else {
+            if (q->effectiveLayoutDirection() == Qt::LeftToRight)
+                pos = -hData.startMargin;
+            else
+                pos = -hData.endMargin;
+        }
+
+        return pos;
     }
 
     void positionViewAtIndex(int index, int mode);
@@ -514,6 +555,7 @@ void QDeclarativeGridViewPrivate::clear()
     currentItem = 0;
     createHighlight();
     trackedItem = 0;
+    markExtentsDirty();
     itemCount = 0;
 }
 
@@ -712,6 +754,7 @@ void QDeclarativeGridViewPrivate::refill(qreal from, qreal to, bool doBuffer)
         deferredRelease = true;
     }
     if (changed) {
+        markExtentsDirty();
         if (header)
             updateHeader();
         if (footer)
@@ -754,6 +797,8 @@ void QDeclarativeGridViewPrivate::layout()
     layoutScheduled = false;
     if (!isValid() && !visibleItems.count()) {
         clear();
+        fixupMode = QDeclarativeFlickablePrivate::Immediate;
+        fixupPosition();
         return;
     }
     if (visibleItems.count()) {
@@ -779,6 +824,7 @@ void QDeclarativeGridViewPrivate::layout()
     if (footer)
         updateFooter();
     q->refill();
+    markExtentsDirty();
     updateHighlight();
     moveReason = Other;
     if (flow == QDeclarativeGridView::LeftToRight) {
@@ -1440,6 +1486,7 @@ void QDeclarativeGridView::setModel(const QVariant &model)
         disconnect(d->model, SIGNAL(destroyingItem(QDeclarativeItem*)), this, SLOT(destroyingItem(QDeclarativeItem*)));
     }
     d->clear();
+    d->setPosition(d->contentStartOffset());
     d->modelVariant = model;
     QObject *object = qvariant_cast<QObject*>(model);
     QDeclarativeVisualModel *vim = 0;
@@ -1481,6 +1528,8 @@ void QDeclarativeGridView::setModel(const QVariant &model)
         connect(d->model, SIGNAL(createdItem(int,QDeclarativeItem*)), this, SLOT(createdItem(int,QDeclarativeItem*)));
         connect(d->model, SIGNAL(destroyingItem(QDeclarativeItem*)), this, SLOT(destroyingItem(QDeclarativeItem*)));
         emit countChanged();
+    } else if (isComponentComplete()) {
+        d->updateViewport();
     }
     emit modelChanged();
 }
@@ -2059,6 +2108,7 @@ void QDeclarativeGridView::setFooter(QDeclarativeComponent *footer)
             d->footer = 0;
         }
         d->footerComponent = footer;
+        d->markExtentsDirty();
         if (isComponentComplete()) {
             d->updateFooter();
             d->updateGrid();
@@ -2095,6 +2145,7 @@ void QDeclarativeGridView::setHeader(QDeclarativeComponent *header)
             d->header = 0;
         }
         d->headerComponent = header;
+        d->markExtentsDirty();
         if (isComponentComplete()) {
             d->updateHeader();
             d->updateFooter();
@@ -2119,6 +2170,15 @@ void QDeclarativeGridView::setContentY(qreal pos)
     // Positioning the view manually should override any current movement state
     d->moveReason = QDeclarativeGridViewPrivate::Other;
     QDeclarativeFlickable::setContentY(pos);
+}
+
+qreal QDeclarativeGridView::originX() const
+{
+    Q_D(const QDeclarativeGridView);
+    if (d->isRightToLeftTopToBottom())
+        return -maxXExtent() + d->size() - d->hData.endMargin;
+    else
+        return -minXExtent() + d->hData.startMargin;
 }
 
 bool QDeclarativeGridView::event(QEvent *event)
@@ -2201,13 +2261,14 @@ qreal QDeclarativeGridView::minYExtent() const
     Q_D(const QDeclarativeGridView);
     if (d->flow == QDeclarativeGridView::TopToBottom)
         return QDeclarativeFlickable::minYExtent();
-    qreal extent = -d->startPosition();
+    qreal extent = d->vData.startMargin - d->startPosition();
     if (d->header && d->visibleItems.count())
         extent += d->header->item->height();
     if (d->haveHighlightRange && d->highlightRange == StrictlyEnforceRange) {
         extent += d->highlightRangeStart;
         extent = qMax(extent, -(d->rowPosAt(0) + d->rowSize() - d->highlightRangeEnd));
     }
+    d->hData.minExtentDirty = false;
     return extent;
 }
 
@@ -2228,9 +2289,11 @@ qreal QDeclarativeGridView::maxYExtent() const
     }
     if (d->footer)
         extent -= d->footer->item->height();
+    extent -= d->vData.endMargin;
     const qreal minY = minYExtent();
     if (extent > minY)
         extent = minY;
+    d->vData.maxExtentDirty = false;
     return extent;
 }
 
@@ -2239,7 +2302,7 @@ qreal QDeclarativeGridView::minXExtent() const
     Q_D(const QDeclarativeGridView);
     if (d->flow == QDeclarativeGridView::LeftToRight)
         return QDeclarativeFlickable::minXExtent();
-    qreal extent = -d->startPosition();
+    qreal extent = -d->startPosition() + d->hData.startMargin;
     qreal highlightStart;
     qreal highlightEnd;
     qreal endPositionFirstItem = 0;
@@ -2263,6 +2326,7 @@ qreal QDeclarativeGridView::minXExtent() const
         extent += d->isRightToLeftTopToBottom() ? -highlightStart : highlightStart;
         extent = qMax(extent, -(endPositionFirstItem - highlightEnd));
     }
+    d->hData.minExtentDirty = false;
     return extent;
 }
 
@@ -2300,14 +2364,17 @@ qreal QDeclarativeGridView::maxXExtent() const
     if (d->isRightToLeftTopToBottom()) {
         if (d->header)
             extent -= d->header->item->width();
+        extent -= d->hData.endMargin;
     } else {
         if (d->footer)
             extent -= d->footer->item->width();
+        extent -= d->hData.endMargin;
     }
 
     const qreal minX = minXExtent();
     if (extent > minX)
         extent = minX;
+    d->hData.maxExtentDirty = false;
     return extent;
 }
 
@@ -2680,6 +2747,7 @@ void QDeclarativeGridView::componentComplete()
     d->updateHeader();
     d->updateFooter();
     d->updateGrid();
+    d->setPosition(d->contentStartOffset());
     if (d->isValid()) {
         refill();
         d->moveReason = QDeclarativeGridViewPrivate::SetIndex;
@@ -2694,6 +2762,8 @@ void QDeclarativeGridView::componentComplete()
         }
         d->moveReason = QDeclarativeGridViewPrivate::Other;
         d->fixupPosition();
+    } else {
+        d->updateViewport();
     }
 }
 
@@ -2978,6 +3048,7 @@ void QDeclarativeGridView::itemsRemoved(int modelIndex, int count)
             d->setPosition(0);
             d->updateHeader();
             d->updateFooter();
+            d->updateViewport();
             update();
         }
     }

@@ -98,8 +98,11 @@ public:
 
     struct AxisData {
         AxisData(QDeclarativeFlickablePrivate *fp, void (QDeclarativeFlickablePrivate::*func)(qreal))
-            : move(fp, func), viewSize(-1), smoothVelocity(fp), atEnd(false), atBeginning(true)
-            , fixingUp(false), inOvershoot(false), moving(false), flicking(false), dragging(false)
+            : move(fp, func), viewSize(-1), startMargin(0), endMargin(0)
+            , smoothVelocity(fp), atEnd(false), atBeginning(true)
+            , fixingUp(false), inOvershoot(false), moving(false), flicking(false)
+            , dragging(false), extentsChanged(false)
+            , explicitValue(false), minExtentDirty(true), maxExtentDirty(true)
         {}
 
         void reset() {
@@ -107,6 +110,12 @@ public:
             dragStartOffset = 0;
             fixingUp = false;
             inOvershoot = false;
+        }
+
+        void markExtentsDirty() {
+            minExtentDirty = true;
+            maxExtentDirty = true;
+            extentsChanged = true;
         }
 
         void addVelocitySample(qreal v, qreal maxVelocity);
@@ -120,6 +129,8 @@ public:
         qreal dragMaxBound;
         qreal velocity;
         qreal flickTarget;
+        qreal startMargin;
+        qreal endMargin;
         QDeclarativeFlickablePrivate::Velocity smoothVelocity;
         QPODVector<qreal,10> velocityBuffer;
         bool atEnd : 1;
@@ -129,6 +140,10 @@ public:
         bool moving : 1;
         bool flicking : 1;
         bool dragging : 1;
+        bool extentsChanged : 1;
+        bool explicitValue : 1;
+        mutable bool minExtentDirty : 1;
+        mutable bool maxExtentDirty : 1;
     };
 
     void flickX(qreal velocity);

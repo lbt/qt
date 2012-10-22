@@ -209,6 +209,7 @@ public:
 
     virtual void setContentX(qreal pos);
     virtual void setContentY(qreal pos);
+    virtual qreal originX() const;
 
     static QDeclarativeListViewAttached *qmlAttachedProperties(QObject *);
 

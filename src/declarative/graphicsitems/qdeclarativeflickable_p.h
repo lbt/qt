@@ -62,6 +62,14 @@ class Q_AUTOTEST_EXPORT QDeclarativeFlickable : public QDeclarativeItem
     Q_PROPERTY(qreal contentY READ contentY WRITE setContentY NOTIFY contentYChanged)
     Q_PROPERTY(QDeclarativeItem *contentItem READ contentItem CONSTANT)
 
+    Q_PROPERTY(qreal topMargin READ topMargin WRITE setTopMargin NOTIFY topMarginChanged REVISION 2)
+    Q_PROPERTY(qreal bottomMargin READ bottomMargin WRITE setBottomMargin NOTIFY bottomMarginChanged REVISION 2)
+    Q_PROPERTY(qreal originY READ originY NOTIFY originYChanged REVISION 2)
+
+    Q_PROPERTY(qreal leftMargin READ leftMargin WRITE setLeftMargin NOTIFY leftMarginChanged REVISION 2)
+    Q_PROPERTY(qreal rightMargin READ rightMargin WRITE setRightMargin NOTIFY rightMarginChanged REVISION 2)
+    Q_PROPERTY(qreal originX READ originX NOTIFY originXChanged REVISION 2)
+
     Q_PROPERTY(qreal horizontalVelocity READ horizontalVelocity NOTIFY horizontalVelocityChanged)
     Q_PROPERTY(qreal verticalVelocity READ verticalVelocity NOTIFY verticalVelocityChanged)
 
@@ -118,6 +126,21 @@ public:
 
     qreal contentY() const;
     virtual void setContentY(qreal pos);
+
+    qreal topMargin() const;
+    void setTopMargin(qreal m);
+
+    qreal bottomMargin() const;
+    void setBottomMargin(qreal m);
+
+    qreal leftMargin() const;
+    void setLeftMargin(qreal m);
+
+    qreal rightMargin() const;
+    void setRightMargin(qreal m);
+
+    virtual qreal originY() const;
+    virtual qreal originX() const;
 
     bool isMoving() const;
     bool isMovingHorizontally() const;
@@ -187,6 +210,12 @@ Q_SIGNALS:
     void flickEnded();
     void dragStarted();
     void dragEnded();
+    Q_REVISION(2) void topMarginChanged();
+    Q_REVISION(2) void bottomMarginChanged();
+    Q_REVISION(2) void leftMarginChanged();
+    Q_REVISION(2) void rightMarginChanged();
+    Q_REVISION(2) void originYChanged();
+    Q_REVISION(2) void originXChanged();
 
 protected:
     virtual bool sceneEventFilter(QGraphicsItem *, QEvent *);
@@ -212,6 +241,7 @@ protected:
     virtual qreal maxYExtent() const;
     qreal vWidth() const;
     qreal vHeight() const;
+    virtual void componentComplete();
     virtual void viewportMoved();
     virtual void geometryChanged(const QRectF &newGeometry,
                                  const QRectF &oldGeometry);

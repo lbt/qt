@@ -162,6 +162,7 @@ public:
 
     virtual void setContentX(qreal pos);
     virtual void setContentY(qreal pos);
+    virtual qreal originX() const;
 
     enum PositionMode { Beginning, Center, End, Visible, Contain };
 

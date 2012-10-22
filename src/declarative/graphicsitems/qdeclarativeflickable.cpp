@@ -417,6 +417,16 @@ void QDeclarativeFlickablePrivate::updateBeginningEnd()
         atBoundaryChange = true;
     }
 
+    if (vData.extentsChanged) {
+        vData.extentsChanged = false;
+        emit q->originYChanged();
+    }
+
+    if (hData.extentsChanged) {
+        hData.extentsChanged = false;
+        emit q->originXChanged();
+    }
+
     if (atBoundaryChange)
         emit q->isAtBoundaryChanged();
 
@@ -577,6 +587,7 @@ qreal QDeclarativeFlickable::contentX() const
 void QDeclarativeFlickable::setContentX(qreal pos)
 {
     Q_D(QDeclarativeFlickable);
+    d->hData.explicitValue = true;
     d->timeline.reset(d->hData.move);
     d->vTime = d->timeline.time();
     movementXEnding();
@@ -595,6 +606,7 @@ qreal QDeclarativeFlickable::contentY() const
 void QDeclarativeFlickable::setContentY(qreal pos)
 {
     Q_D(QDeclarativeFlickable);
+    d->hData.explicitValue = true;
     d->timeline.reset(d->vData.move);
     d->vTime = d->timeline.time();
     movementYEnding();
@@ -775,10 +787,10 @@ void QDeclarativeFlickablePrivate::handleMousePressEvent(QGraphicsSceneMouseEven
     timeline.clear();
     hData.reset();
     vData.reset();
-    hData.dragMinBound = q->minXExtent();
-    vData.dragMinBound = q->minYExtent();
-    hData.dragMaxBound = q->maxXExtent();
-    vData.dragMaxBound = q->maxYExtent();
+    hData.dragMinBound = q->minXExtent() - hData.startMargin;
+    vData.dragMinBound = q->minYExtent() - vData.startMargin;
+    hData.dragMaxBound = q->maxXExtent() + hData.endMargin;
+    vData.dragMaxBound = q->maxYExtent() + vData.endMargin;
     fixupMode = Normal;
     lastPos = QPoint();
     QDeclarativeItemPrivate::start(lastPosTime);
@@ -808,8 +820,11 @@ void QDeclarativeFlickablePrivate::handleMouseMoveEvent(QGraphicsSceneMouseEvent
             if (!vMoved)
                 vData.dragStartOffset = dy;
             qreal newY = dy + vData.pressPos - vData.dragStartOffset;
-            const qreal minY = vData.dragMinBound;
-            const qreal maxY = vData.dragMaxBound;
+            // Recalculate bounds in case margins have changed, but use the content
+            // size estimate taken at the start of the drag in case the drag causes
+            // the estimate to be altered
+            const qreal minY = vData.dragMinBound + vData.startMargin;
+            const qreal maxY = vData.dragMaxBound - vData.endMargin;
             if (newY > minY)
                 newY = minY + (newY - minY) / 2;
             if (newY < maxY && maxY - minY <= 0)
@@ -840,8 +855,8 @@ void QDeclarativeFlickablePrivate::handleMouseMoveEvent(QGraphicsSceneMouseEvent
             if (!hMoved)
                 hData.dragStartOffset = dx;
             qreal newX = dx + hData.pressPos - hData.dragStartOffset;
-            const qreal minX = hData.dragMinBound;
-            const qreal maxX = hData.dragMaxBound;
+            const qreal minX = hData.dragMinBound + hData.startMargin;
+            const qreal maxX = hData.dragMaxBound - hData.endMargin;
             if (newX > minX)
                 newX = minX + (newX - minX) / 2;
             if (newX < maxX && maxX - minX <= 0)
@@ -1117,23 +1132,37 @@ void QDeclarativeFlickable::timerEvent(QTimerEvent *event)
 
 qreal QDeclarativeFlickable::minYExtent() const
 {
-    return 0.0;
+    Q_D(const QDeclarativeFlickable);
+    return d->vData.startMargin;
 }
 
 qreal QDeclarativeFlickable::minXExtent() const
 {
-    return 0.0;
+    Q_D(const QDeclarativeFlickable);
+    return d->hData.startMargin;
 }
 
 /* returns -ve */
 qreal QDeclarativeFlickable::maxXExtent() const
 {
-    return width() - vWidth();
+    Q_D(const QDeclarativeFlickable);
+    return width() - vWidth() - d->hData.endMargin;
 }
 /* returns -ve */
 qreal QDeclarativeFlickable::maxYExtent() const
 {
-    return height() - vHeight();
+    Q_D(const QDeclarativeFlickable);
+    return height() - vHeight() - d->vData.endMargin;
+}
+
+void QDeclarativeFlickable::componentComplete()
+{
+    Q_D(QDeclarativeFlickable);
+    QDeclarativeItem::componentComplete();
+    if (!d->hData.explicitValue && d->hData.startMargin != 0.)
+        setContentX(-minXExtent());
+    if (!d->vData.explicitValue && d->vData.startMargin != 0.)
+        setContentY(-minYExtent());
 }
 
 void QDeclarativeFlickable::viewportMoved()
@@ -1377,6 +1406,7 @@ void QDeclarativeFlickable::setContentWidth(qreal w)
         d->contentItem->setWidth(width());
     else
         d->contentItem->setWidth(w);
+    d->hData.markExtentsDirty();
     // Make sure that we're entirely in view.
     if (!d->pressed && !d->hData.moving && !d->vData.moving) {
         d->fixupMode = QDeclarativeFlickablePrivate::Immediate;
@@ -1405,6 +1435,7 @@ void QDeclarativeFlickable::setContentHeight(qreal h)
         d->contentItem->setHeight(height());
     else
         d->contentItem->setHeight(h);
+    d->vData.markExtentsDirty();
     // Make sure that we're entirely in view.
     if (!d->pressed && !d->hData.moving && !d->vData.moving) {
         d->fixupMode = QDeclarativeFlickablePrivate::Immediate;
@@ -1415,6 +1446,121 @@ void QDeclarativeFlickable::setContentHeight(qreal h)
     }
     emit contentHeightChanged();
     d->updateBeginningEnd();
+}
+
+/*!
+    \qmlproperty real Flickable::topMargin
+    \qmlproperty real Flickable::leftMargin
+    \qmlproperty real Flickable::bottomMargin
+    \qmlproperty real Flickable::rightMargin
+
+    These properties hold the margins around the content.  This space is reserved
+    in addition to the contentWidth and contentHeight.
+*/
+
+qreal QDeclarativeFlickable::topMargin() const
+{
+    Q_D(const QDeclarativeFlickable);
+    return d->vData.startMargin;
+}
+
+void QDeclarativeFlickable::setTopMargin(qreal m)
+{
+    Q_D(QDeclarativeFlickable);
+    if (d->vData.startMargin == m)
+        return;
+    d->vData.startMargin = m;
+    d->vData.markExtentsDirty();
+    if (!d->pressed && !d->hData.moving && !d->vData.moving) {
+        d->fixupMode = QDeclarativeFlickablePrivate::Immediate;
+        d->fixupY();
+    }
+    emit topMarginChanged();
+    d->updateBeginningEnd();
+}
+
+qreal QDeclarativeFlickable::bottomMargin() const
+{
+    Q_D(const QDeclarativeFlickable);
+    return d->vData.endMargin;
+}
+
+void QDeclarativeFlickable::setBottomMargin(qreal m)
+{
+    Q_D(QDeclarativeFlickable);
+    if (d->vData.endMargin == m)
+        return;
+    d->vData.endMargin = m;
+    d->vData.markExtentsDirty();
+    if (!d->pressed && !d->hData.moving && !d->vData.moving) {
+        d->fixupMode = QDeclarativeFlickablePrivate::Immediate;
+        d->fixupY();
+    }
+    emit bottomMarginChanged();
+    d->updateBeginningEnd();
+}
+
+qreal QDeclarativeFlickable::leftMargin() const
+{
+    Q_D(const QDeclarativeFlickable);
+    return d->hData.startMargin;
+}
+
+void QDeclarativeFlickable::setLeftMargin(qreal m)
+{
+    Q_D(QDeclarativeFlickable);
+    if (d->hData.startMargin == m)
+        return;
+    d->hData.startMargin = m;
+    d->hData.markExtentsDirty();
+    if (!d->pressed && !d->hData.moving && !d->vData.moving) {
+        d->fixupMode = QDeclarativeFlickablePrivate::Immediate;
+        d->fixupX();
+    }
+    emit leftMarginChanged();
+    d->updateBeginningEnd();
+}
+
+qreal QDeclarativeFlickable::rightMargin() const
+{
+    Q_D(const QDeclarativeFlickable);
+    return d->hData.endMargin;
+}
+
+void QDeclarativeFlickable::setRightMargin(qreal m)
+{
+    Q_D(QDeclarativeFlickable);
+    if (d->hData.endMargin == m)
+        return;
+    d->hData.endMargin = m;
+    d->hData.markExtentsDirty();
+    if (!d->pressed && !d->hData.moving && !d->vData.moving) {
+        d->fixupMode = QDeclarativeFlickablePrivate::Immediate;
+        d->fixupX();
+    }
+    emit rightMarginChanged();
+    d->updateBeginningEnd();
+}
+
+/*!
+    \qmlproperty real Flickable::originY
+    \qmlproperty real Flickable::originX
+
+    These properties hold the origin of the content.  This is usually (0,0), however
+    ListView and GridView may have an arbitrary origin due to delegate size variation,
+    or item insertion/removal outside the visible region.
+*/
+
+qreal QDeclarativeFlickable::originY() const
+{
+    Q_D(const QDeclarativeFlickable);
+    return -minYExtent() + d->vData.startMargin;
+}
+
+qreal QDeclarativeFlickable::originX() const
+{
+    Q_D(const QDeclarativeFlickable);
+    return -minXExtent() + d->hData.startMargin;
 }
 
 /*!
