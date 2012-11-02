@@ -437,6 +437,7 @@ QDeclarativeScriptEngine::QDeclarativeScriptEngine(QDeclarativeEnginePrivate *pr
     qtObject.setProperty(QLatin1String("formatDate"),newFunction(QDeclarativeEnginePrivate::formatDate, 2));
     qtObject.setProperty(QLatin1String("formatTime"),newFunction(QDeclarativeEnginePrivate::formatTime, 2));
     qtObject.setProperty(QLatin1String("formatDateTime"),newFunction(QDeclarativeEnginePrivate::formatDateTime, 2));
+    qtObject.setProperty(QLatin1String("weekNumber"),newFunction(QDeclarativeEnginePrivate::weekNumber, 1));
 #endif
 
     //misc methods
@@ -1675,6 +1676,20 @@ QScriptValue QDeclarativeEnginePrivate::formatDateTime(QScriptContext*ctxt, QScr
         }
     }
     return engine->newVariant(QVariant::fromValue(date.toString(enumFormat)));
+}
+
+QScriptValue QDeclarativeEnginePrivate::weekNumber(QScriptContext*ctxt, QScriptEngine*engine)
+{
+    int argCount = ctxt->argumentCount();
+    if(argCount == 0 || argCount > 1)
+        return ctxt->throwError(QLatin1String("Qt.weekNumber(): Invalid arguments"));
+
+    QScriptValue sv = ctxt->argument(0);
+    if (!sv.isDate())
+        return ctxt->throwError(QLatin1String("Qt.weekNumber(): Invalid date argument"));
+
+    QDate date = sv.toDateTime().date();
+    return engine->newVariant(QVariant::fromValue(date.weekNumber()));
 }
 #endif // QT_NO_DATESTRING
 
