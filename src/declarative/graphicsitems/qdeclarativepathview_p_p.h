@@ -74,12 +74,12 @@ class QDeclarativePathViewPrivate : public QDeclarativeItemPrivate, public QDecl
 
 public:
     QDeclarativePathViewPrivate()
-      : path(0), currentIndex(0), currentItemOffset(0.0), startPc(0), lastDist(0)
-        , lastElapsed(0), offset(0.0), offsetAdj(0.0), mappedRange(1.0)
+      : path(0), currentIndex(0), currentItemOffset(0.0), startPc(0)
+        , offset(0.0), offsetAdj(0.0), mappedRange(1.0)
         , stealMouse(false), ownModel(false), interactive(true), haveHighlightRange(true)
         , autoHighlight(true), highlightUp(false), layoutScheduled(false)
-        , moving(false), flicking(false)
-        , dragMargin(0), deceleration(100)
+        , moving(false), flicking(false), dragging(false)
+        , dragMargin(0), deceleration(100), maximumFlickVelocity(0)
         , moveOffset(this, &QDeclarativePathViewPrivate::setAdjustedOffset)
         , firstIndex(-1), pathItems(-1), requestedIndex(-1)
         , moveReason(Other), moveDirection(Shortest), attType(0), highlightComponent(0), highlightItem(0)
@@ -87,7 +87,7 @@ public:
         , highlightPosition(0)
         , highlightRangeStart(0), highlightRangeEnd(0)
         , highlightRangeMode(QDeclarativePathView::StrictlyEnforceRange)
-        , highlightMoveDuration(300), modelCount(0)
+        , highlightMoveDuration(300), modelCount(0), snapMode(QDeclarativePathView::NoSnap)
     {
     }
 
@@ -135,8 +135,11 @@ public:
     void setAdjustedOffset(qreal offset);
     void regenerate();
     void updateItem(QDeclarativeItem *, qreal);
-    void snapToCurrent();
+    void snapToIndex(int index);
     QPointF pointNear(const QPointF &point, qreal *nearPercent=0) const;
+    void addVelocitySample(qreal v);
+    qreal calcVelocity() const;
+    void setDragging(bool d);
 
     QDeclarativePath *path;
     int currentIndex;
@@ -144,8 +147,6 @@ public:
     qreal currentItemOffset;
     qreal startPc;
     QPointF startPoint;
-    qreal lastDist;
-    int lastElapsed;
     qreal offset;
     qreal offsetAdj;
     qreal mappedRange;
@@ -158,10 +159,13 @@ public:
     bool layoutScheduled : 1;
     bool moving : 1;
     bool flicking : 1;
-    QElapsedTimer lastPosTime;
+    bool dragging : 1;
+    QElapsedTimer timer;
+    QElapsedTimer lastPosTimer;
     QPointF lastPos;
     qreal dragMargin;
     qreal deceleration;
+    qreal maximumFlickVelocity;
     QDeclarativeTimeLine tl;
     QDeclarativeTimeLineValueProxy<QDeclarativePathViewPrivate> moveOffset;
     int firstIndex;
@@ -185,6 +189,8 @@ public:
     QDeclarativePathView::HighlightRangeMode highlightRangeMode;
     int highlightMoveDuration;
     int modelCount;
+    QPODVector<qreal,10> velocityBuffer;
+    QDeclarativePathView::SnapMode snapMode;
 };
 
 QT_END_NAMESPACE

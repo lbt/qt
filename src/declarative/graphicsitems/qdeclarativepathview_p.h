@@ -71,17 +71,21 @@ class Q_AUTOTEST_EXPORT QDeclarativePathView : public QDeclarativeItem
     Q_PROPERTY(int highlightMoveDuration READ highlightMoveDuration WRITE setHighlightMoveDuration NOTIFY highlightMoveDurationChanged)
 
     Q_PROPERTY(qreal dragMargin READ dragMargin WRITE setDragMargin NOTIFY dragMarginChanged)
+    Q_PROPERTY(qreal maximumFlickVelocity READ maximumFlickVelocity WRITE setMaximumFlickVelocity NOTIFY maximumFlickVelocityChanged REVISION 2)
     Q_PROPERTY(qreal flickDeceleration READ flickDeceleration WRITE setFlickDeceleration NOTIFY flickDecelerationChanged)
     Q_PROPERTY(bool interactive READ isInteractive WRITE setInteractive NOTIFY interactiveChanged)
 
     Q_PROPERTY(bool moving READ isMoving NOTIFY movingChanged)
     Q_PROPERTY(bool flicking READ isFlicking NOTIFY flickingChanged)
+    Q_PROPERTY(bool dragging READ isDragging NOTIFY draggingChanged REVISION 2)
 
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     Q_PROPERTY(QDeclarativeComponent *delegate READ delegate WRITE setDelegate NOTIFY delegateChanged)
     Q_PROPERTY(int pathItemCount READ pathItemCount WRITE setPathItemCount NOTIFY pathItemCountChanged)
+    Q_PROPERTY(SnapMode snapMode READ snapMode WRITE setSnapMode NOTIFY snapModeChanged REVISION 2)
 
     Q_ENUMS(HighlightRangeMode)
+    Q_ENUMS(SnapMode)
 
 public:
     QDeclarativePathView(QDeclarativeItem *parent=0);
@@ -122,11 +126,15 @@ public:
     qreal flickDeceleration() const;
     void setFlickDeceleration(qreal dec);
 
+    qreal maximumFlickVelocity() const;
+    void setMaximumFlickVelocity(qreal);
+
     bool isInteractive() const;
     void setInteractive(bool);
 
     bool isMoving() const;
     bool isFlicking() const;
+    bool isDragging() const;
 
     int count() const;
 
@@ -135,6 +143,10 @@ public:
 
     int pathItemCount() const;
     void setPathItemCount(int);
+
+    enum SnapMode { NoSnap, SnapToItem, SnapOneItem };
+    SnapMode snapMode() const;
+    void setSnapMode(SnapMode mode);
 
     static QDeclarativePathViewAttached *qmlAttachedProperties(QObject *);
 
@@ -155,10 +167,12 @@ Q_SIGNALS:
     void snapPositionChanged();
     void delegateChanged();
     void pathItemCountChanged();
+    void maximumFlickVelocityChanged();
     void flickDecelerationChanged();
     void interactiveChanged();
     void movingChanged();
     void flickingChanged();
+    void draggingChanged();
     void highlightChanged();
     void highlightItemChanged();
     void highlightMoveDurationChanged();
@@ -166,6 +180,9 @@ Q_SIGNALS:
     void movementEnded();
     void flickStarted();
     void flickEnded();
+    void dragStarted();
+    void dragEnded();
+    void snapModeChanged();
 
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event);

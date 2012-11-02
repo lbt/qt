@@ -52,7 +52,26 @@
 #include <qmath.h>
 #include <math.h>
 
+// The number of samples to use in calculating the velocity of a flick
+#ifndef QML_FLICK_SAMPLEBUFFER
+#define QML_FLICK_SAMPLEBUFFER 1
+#endif
+
+// The number of samples to discard when calculating the flick velocity.
+// Touch panels often produce inaccurate results as the finger is lifted.
+#ifndef QML_FLICK_DISCARDSAMPLES
+#define QML_FLICK_DISCARDSAMPLES 0
+#endif
+
+// The default maximum velocity of a flick.
+#ifndef QML_FLICK_DEFAULTMAXVELOCITY
+#define QML_FLICK_DEFAULTMAXVELOCITY 2500
+#endif
+
+
 QT_BEGIN_NAMESPACE
+
+const qreal MinimumFlickVelocity = 75.0;
 
 inline qreal qmlMod(qreal x, qreal y)
 {
@@ -94,12 +113,13 @@ void QDeclarativePathViewAttached::setValue(const QByteArray &name, const QVaria
 void QDeclarativePathViewPrivate::init()
 {
     Q_Q(QDeclarativePathView);
+    maximumFlickVelocity = QML_FLICK_DEFAULTMAXVELOCITY;
     offset = 0;
     q->setAcceptedMouseButtons(Qt::LeftButton);
     q->setFlag(QGraphicsItem::ItemIsFocusScope);
     q->setFiltersChildEvents(true);
     q->connect(&tl, SIGNAL(updated()), q, SLOT(ticked()));
-    lastPosTime.invalidate();
+    timer.invalidate();
     static int timelineCompletedIdx = -1;
     static int movementEndingIdx = -1;
     if (timelineCompletedIdx == -1) {
@@ -178,7 +198,8 @@ qreal QDeclarativePathViewPrivate::positionOfIndex(qreal index) const
 
     if (model && index >= 0 && index < modelCount) {
         qreal start = 0.0;
-        if (haveHighlightRange && highlightRangeMode != QDeclarativePathView::NoHighlightRange)
+        if (haveHighlightRange && (highlightRangeMode != QDeclarativePathView::NoHighlightRange
+                                   || snapMode != QDeclarativePathView::NoSnap))
             start = highlightRangeStart;
         qreal globalPos = index + offset;
         globalPos = qmlMod(globalPos, qreal(modelCount)) / modelCount;
@@ -343,6 +364,21 @@ void QDeclarativePathViewPrivate::regenerate()
     firstIndex = -1;
     updateMappedRange();
     q->refill();
+}
+
+void QDeclarativePathViewPrivate::setDragging(bool d)
+{
+    Q_Q(QDeclarativePathView);
+    if (dragging == d)
+        return;
+
+    dragging = d;
+    if (dragging)
+        emit q->dragStarted();
+    else
+        emit q->dragEnded();
+
+    emit q->draggingChanged();
 }
 
 /*!
@@ -607,7 +643,7 @@ void QDeclarativePathView::setCurrentIndex(int idx)
         d->currentIndex = idx;
         if (d->modelCount) {
             if (d->haveHighlightRange && d->highlightRangeMode == QDeclarativePathView::StrictlyEnforceRange)
-                d->snapToCurrent();
+                d->snapToIndex(d->currentIndex);
             int itemIndex = (idx - d->firstIndex + d->modelCount) % d->modelCount;
             if (itemIndex < d->items.count()) {
                 d->currentItem = d->items.at(itemIndex);
@@ -797,7 +833,7 @@ void QDeclarativePathView::setPreferredHighlightBegin(qreal start)
     if (d->highlightRangeStart == start || start < 0 || start > 1.0)
         return;
     d->highlightRangeStart = start;
-    d->haveHighlightRange = d->highlightRangeMode != NoHighlightRange && d->highlightRangeStart <= d->highlightRangeEnd;
+    d->haveHighlightRange = d->highlightRangeStart <= d->highlightRangeEnd;
     refill();
     emit preferredHighlightBeginChanged();
 }
@@ -814,7 +850,7 @@ void QDeclarativePathView::setPreferredHighlightEnd(qreal end)
     if (d->highlightRangeEnd == end || end < 0 || end > 1.0)
         return;
     d->highlightRangeEnd = end;
-    d->haveHighlightRange = d->highlightRangeMode != NoHighlightRange && d->highlightRangeStart <= d->highlightRangeEnd;
+    d->haveHighlightRange = d->highlightRangeStart <= d->highlightRangeEnd;
     refill();
     emit preferredHighlightEndChanged();
 }
@@ -905,6 +941,27 @@ void QDeclarativePathView::setFlickDeceleration(qreal dec)
 }
 
 /*!
+    \qmlproperty real PathView::maximumFlickVelocity
+    This property holds the approximate maximum velocity that the user can flick the view in pixels/second.
+
+    The default value is platform dependent.
+*/
+qreal QDeclarativePathView::maximumFlickVelocity() const
+{
+    Q_D(const QDeclarativePathView);
+    return d->maximumFlickVelocity;
+}
+
+void QDeclarativePathView::setMaximumFlickVelocity(qreal vel)
+{
+    Q_D(QDeclarativePathView);
+    if (vel == d->maximumFlickVelocity)
+        return;
+    d->maximumFlickVelocity = vel;
+    emit maximumFlickVelocityChanged();
+}
+
+/*!
     \qmlproperty bool PathView::interactive
 
     A user cannot drag or flick a PathView that is not interactive.
@@ -954,6 +1011,18 @@ bool QDeclarativePathView::isFlicking() const
 }
 
 /*!
+    \qmlproperty bool PathView::dragging
+
+    This property holds whether the view is currently moving
+    due to the user dragging the view.
+*/
+bool QDeclarativePathView::isDragging() const
+{
+    Q_D(const QDeclarativePathView);
+    return d->dragging;
+}
+
+/*!
     \qmlsignal PathView::onMovementStarted()
 
     This handler is called when the view begins moving due to user
@@ -982,6 +1051,22 @@ bool QDeclarativePathView::isFlicking() const
     \qmlsignal PathView::onFlickEnded()
 
     This handler is called when the view stops moving due to a flick.
+*/
+
+/*!
+    \qmlsignal PathView::onDragStarted()
+
+    This handler is called when the view starts to be dragged due to user
+    interaction.
+*/
+
+/*!
+    \qmlsignal PathView::onDragEnded()
+
+    This handler is called when the user stops dragging the view.
+
+    If the velocity of the drag is suffient at the time the
+    touch/mouse button is released then a flick will start.
 */
 
 /*!
@@ -1058,6 +1143,41 @@ void QDeclarativePathView::setPathItemCount(int i)
     emit pathItemCountChanged();
 }
 
+/*!
+    \qmlproperty enumeration PathView::snapMode
+
+    This property determines how the items will settle following a drag or flick.
+    The possible values are:
+
+    \list
+    \li PathView.NoSnap (default) - the items stop anywhere along the path.
+    \li PathView.SnapToItem - the items settle with an item aligned with the \l preferredHighlightBegin.
+    \li PathView.SnapOneItem - the items settle no more than one item away from the item nearest
+        \l preferredHighlightBegin at the time the press is released.  This mode is particularly
+        useful for moving one page at a time.
+    \endlist
+
+    \c snapMode does not affect the \l currentIndex.  To update the
+    \l currentIndex as the view is moved, set \l highlightRangeMode
+    to \c PathView.StrictlyEnforceRange (default for PathView).
+
+    \sa highlightRangeMode
+*/
+QDeclarativePathView::SnapMode QDeclarativePathView::snapMode() const
+{
+    Q_D(const QDeclarativePathView);
+    return d->snapMode;
+}
+
+void QDeclarativePathView::setSnapMode(SnapMode mode)
+{
+    Q_D(QDeclarativePathView);
+    if (mode == d->snapMode)
+        return;
+    d->snapMode = mode;
+    emit snapModeChanged();
+}
+
 QPointF QDeclarativePathViewPrivate::pointNear(const QPointF &point, qreal *nearPercent) const
 {
     //XXX maybe do recursively at increasing resolution.
@@ -1081,6 +1201,27 @@ QPointF QDeclarativePathViewPrivate::pointNear(const QPointF &point, qreal *near
     return nearPoint;
 }
 
+void QDeclarativePathViewPrivate::addVelocitySample(qreal v)
+{
+    velocityBuffer.append(v);
+    if (velocityBuffer.count() > QML_FLICK_SAMPLEBUFFER)
+        velocityBuffer.remove(0);
+}
+
+qreal QDeclarativePathViewPrivate::calcVelocity() const
+{
+    qreal velocity = 0;
+    if (velocityBuffer.count() > QML_FLICK_DISCARDSAMPLES) {
+        int count = velocityBuffer.count()-QML_FLICK_DISCARDSAMPLES;
+        for (int i = 0; i < count; ++i) {
+            qreal v = velocityBuffer.at(i);
+            velocity += v;
+        }
+        velocity /= count;
+    }
+    return velocity;
+}
+
 void QDeclarativePathView::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     Q_D(QDeclarativePathView);
@@ -1095,8 +1236,10 @@ void QDeclarativePathView::mousePressEvent(QGraphicsSceneMouseEvent *event)
 void QDeclarativePathViewPrivate::handleMousePressEvent(QGraphicsSceneMouseEvent *event)
 {
     Q_Q(QDeclarativePathView);
-    if (!interactive || !items.count())
+    if (!interactive || !items.count() || !model || !modelCount)
         return;
+    velocityBuffer.clear();
+
     QPointF scenePoint = q->mapToScene(event->pos());
     int idx = 0;
     for (; idx < items.count(); ++idx) {
@@ -1120,9 +1263,8 @@ void QDeclarativePathViewPrivate::handleMousePressEvent(QGraphicsSceneMouseEvent
     else
         stealMouse = false;
 
-    lastElapsed = 0;
-    lastDist = 0;
-    QDeclarativeItemPrivate::start(lastPosTime);
+    QDeclarativeItemPrivate::start(timer);
+    lastPosTimer.start();
     tl.clear();
 }
 
@@ -1142,16 +1284,16 @@ void QDeclarativePathView::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
 void QDeclarativePathViewPrivate::handleMouseMoveEvent(QGraphicsSceneMouseEvent *event)
 {
     Q_Q(QDeclarativePathView);
-    if (!interactive || !lastPosTime.isValid())
+    if (!interactive || !timer.isValid() || !model || !modelCount)
         return;
 
+    qint64 elapsed = lastPosTimer.restart();
     qreal newPc;
     QPointF pathPoint = pointNear(event->pos(), &newPc);
     if (!stealMouse) {
         QPointF delta = pathPoint - startPoint;
         if (qAbs(delta.x()) > QApplication::startDragDistance() || qAbs(delta.y()) > QApplication::startDragDistance()) {
             stealMouse = true;
-            startPc = newPc;
         }
     }
 
@@ -1166,16 +1308,17 @@ void QDeclarativePathViewPrivate::handleMouseMoveEvent(QGraphicsSceneMouseEvent 
             else if (diff < -modelCount/2)
                 diff += modelCount;
 
-            lastElapsed = QDeclarativeItemPrivate::restart(lastPosTime);
-            lastDist = diff;
-            startPc = newPc;
+            if (elapsed > 0)
+                addVelocitySample(diff / (qreal(elapsed) / 1000.));
         }
         if (!moving) {
             moving = true;
             emit q->movingChanged();
             emit q->movementStarted();
         }
+        setDragging(true);
     }
+    startPc = newPc;
 }
 
 void QDeclarativePathView::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
@@ -1195,33 +1338,54 @@ void QDeclarativePathViewPrivate::handleMouseReleaseEvent(QGraphicsSceneMouseEve
     Q_Q(QDeclarativePathView);
     stealMouse = false;
     q->setKeepMouseGrab(false);
-    if (!interactive || !lastPosTime.isValid())
+    setDragging(false);
+    if (!interactive || !timer.isValid() || !model || !modelCount) {
+        timer.invalidate();
+        if (!tl.isActive())
+            q->movementEnding();
         return;
+    }
 
-    qreal elapsed = qreal(lastElapsed + QDeclarativeItemPrivate::elapsed(lastPosTime)) / 1000.;
-    qreal velocity = elapsed > 0. ? lastDist / elapsed : 0;
-    if (model && modelCount && qAbs(velocity) > qreal(1.)) {
-        qreal count = pathItems == -1 ? modelCount : pathItems;
-        if (qAbs(velocity) > count * 2) // limit velocity
-            velocity = (velocity > 0 ? count : -count) * 2;
+    qreal velocity = calcVelocity();
+    qreal count = pathItems == -1 ? modelCount : qMin(pathItems, modelCount);
+    qreal pixelVelocity = (path->path().length()/count) * velocity;
+    if (qAbs(pixelVelocity) > MinimumFlickVelocity) {
+        if (qAbs(pixelVelocity) > maximumFlickVelocity || snapMode == QDeclarativePathView::SnapOneItem) {
+            // limit velocity
+            qreal maxVel = velocity < 0 ? -maximumFlickVelocity : maximumFlickVelocity;
+            velocity = maxVel / (path->path().length()/count);
+        }
         // Calculate the distance to be travelled
         qreal v2 = velocity*velocity;
         qreal accel = deceleration/10;
-        // + 0.25 to encourage moving at least one item in the flick direction
-        qreal dist = qMin(qreal(modelCount-1), qreal(v2 / (accel * qreal(2.0)) + qreal(0.25)));
-        if (haveHighlightRange && highlightRangeMode == QDeclarativePathView::StrictlyEnforceRange) {
-            // round to nearest item.
-            if (velocity > 0.)
-                dist = qRound(dist + offset) - offset;
-            else
-                dist = qRound(dist - offset) + offset;
+        qreal dist = 0;
+        if (haveHighlightRange && (highlightRangeMode == QDeclarativePathView::StrictlyEnforceRange
+                || snapMode != QDeclarativePathView::NoSnap)) {
+            if (snapMode == QDeclarativePathView::SnapOneItem) {
+                // encourage snapping one item in direction of motion
+                if (velocity > 0.)
+                    dist = qRound(0.5 + offset) - offset;
+                else
+                    dist = qRound(0.5 - offset) + offset;
+            } else {
+                // + 0.25 to encourage moving at least one item in the flick direction
+                dist = qMin(qreal(modelCount-1), qreal(v2 / (accel * 2.0) + 0.25));
+
+                // round to nearest item.
+                if (velocity > 0.)
+                    dist = qRound(dist + offset) - offset;
+                else
+                    dist = qRound(dist - offset) + offset;
+            }
             // Calculate accel required to stop on item boundary
             if (dist <= 0.) {
-                dist = qreal(0.);
-                accel = qreal(0.);
+                dist = 0.;
+                accel = 0.;
             } else {
                 accel = v2 / (2.0f * qAbs(dist));
             }
+        } else {
+            dist = qMin(qreal(modelCount-1), qreal(v2 / (accel * 2.0)));
         }
         offsetAdj = qreal(0.0);
         moveOffset.setValue(offset);
@@ -1236,7 +1400,7 @@ void QDeclarativePathViewPrivate::handleMouseReleaseEvent(QGraphicsSceneMouseEve
         fixOffset();
     }
 
-    lastPosTime.invalidate();
+    timer.invalidate();
     if (!tl.isActive())
         q->movementEnding();
 }
@@ -1281,8 +1445,8 @@ bool QDeclarativePathView::sendMouseEvent(QGraphicsSceneMouseEvent *event)
             grabMouse();
 
         return d->stealMouse;
-    } else if (d->lastPosTime.isValid()) {
-        d->lastPosTime.invalidate();
+    } else if (d->timer.isValid()) {
+        d->timer.invalidate();
     }
     if (mouseEvent.type() == QEvent::GraphicsSceneMouseRelease)
         d->stealMouse = false;
@@ -1531,7 +1695,7 @@ void QDeclarativePathView::itemsRemoved(int modelIndex, int count)
         d->regenerate();
         d->updateCurrent();
         if (!d->flicking && !d->moving && d->haveHighlightRange && d->highlightRangeMode == QDeclarativePathView::StrictlyEnforceRange)
-            d->snapToCurrent();
+            d->snapToIndex(d->currentIndex);
     }
     if (changedOffset)
         emit offsetChanged();
@@ -1672,22 +1836,23 @@ void QDeclarativePathViewPrivate::fixOffset()
 {
     Q_Q(QDeclarativePathView);
     if (model && items.count()) {
-        if (haveHighlightRange && highlightRangeMode == QDeclarativePathView::StrictlyEnforceRange) {
+        if (haveHighlightRange && (highlightRangeMode == QDeclarativePathView::StrictlyEnforceRange
+                || snapMode != QDeclarativePathView::NoSnap)) {
             int curr = calcCurrentIndex();
-            if (curr != currentIndex)
+            if (curr != currentIndex && highlightRangeMode == QDeclarativePathView::StrictlyEnforceRange)
                 q->setCurrentIndex(curr);
             else
-                snapToCurrent();
+                snapToIndex(curr);
         }
     }
 }
 
-void QDeclarativePathViewPrivate::snapToCurrent()
+void QDeclarativePathViewPrivate::snapToIndex(int index)
 {
     if (!model || modelCount <= 0)
         return;
 
-    qreal targetOffset = qmlMod(modelCount - currentIndex, modelCount);
+    qreal targetOffset = qmlMod(modelCount - index, modelCount);
 
     moveReason = Other;
     offsetAdj = 0.0;

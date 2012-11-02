@@ -202,6 +202,7 @@ void QDeclarativeItemModule::defineModule()
 
     // QtQuick 1.2 items
     qmlRegisterType<QDeclarativeFlickable,2>("QtQuick",1,2,"Flickable");
+    qmlRegisterType<QDeclarativePathView,2>("QtQuick",1,2,"PathView");
 
 #ifndef QT_NO_IMPORT_QT47_QML
 #ifdef QT_NO_MOVIE
