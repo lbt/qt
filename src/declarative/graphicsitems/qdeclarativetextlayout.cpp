@@ -233,12 +233,21 @@ class DrawTextItemDevice: public QPaintDevice
         DrawTextItemRecorder *m_paintEngine;
 };
 
+class InvalidColorPainter : public QPainter
+{
+public:
+    InvalidColorPainter(QPaintDevice *d) : QPainter(d)
+    {
+        setPen(QPen(QColor()));
+    }
+};
+
 struct InertTextPainter {
     InertTextPainter()
     : device(true, true), painter(&device) {}
 
     DrawTextItemDevice device;
-    QPainter painter;
+    InvalidColorPainter painter;
 };
 }
 
@@ -371,11 +380,19 @@ void QDeclarativeTextLayout::draw(QPainter *painter, const QPointF &p)
 
     QPen oldPen = priv->state->pen;
     QColor currentColor = oldPen.color();
+    QColor defaultColor = currentColor;
     for (int ii = 0; ii < itemCount; ++ii) {
         QStaticTextItem &item = d->items[ii];
         if (item.color.isValid() && currentColor != item.color) {
+            // up-edge of a <font color="">text</font> tag
+            // we set the painter pen to the text item's specified color.
             painter->setPen(item.color);
             currentColor = item.color;
+        } else if (!item.color.isValid() && currentColor != defaultColor) {
+            // down-edge of a <font color="">text</font> tag
+            // we reset the painter pen back to the default color.
+            currentColor = defaultColor;
+            painter->setPen(currentColor);
         }
         priv->extended->drawStaticTextItem(&item);
 
