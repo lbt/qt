@@ -97,4 +97,6 @@
 #define QT_VSNPRINTF		::vsnprintf
 #endif
 
+#define QT_GUI_PASSWORD_ECHO_DELAY 1000
+
 #endif // QPLATFORMDEFS_H
