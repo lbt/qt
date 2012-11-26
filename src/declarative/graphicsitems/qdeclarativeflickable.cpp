@@ -1697,6 +1697,22 @@ bool QDeclarativeFlickable::sendMouseEvent(QGraphicsSceneMouseEvent *event)
 
         switch(mouseEvent.type()) {
         case QEvent::GraphicsSceneMouseMove:
+            if (d->delayedPressEvent) {
+                // A move beyond the threshold replays the press to give nested Flickables
+                // the opportunity to grab the gesture.
+                QPointF delta = event->pos() - d->delayedPressEvent->pos();
+                if (qAbs(delta.x()) > QApplication::startDragDistance()
+                        || qAbs(delta.y()) > QApplication::startDragDistance()) {
+                    // We replay the mouse press but the grabber we had might not be interessted by the event (e.g. overlay)
+                    // so we reset the grabber
+                    if (s->mouseGrabberItem() == d->delayedPressTarget)
+                        d->delayedPressTarget->ungrabMouse();
+                    //Use the event handler that will take care of finding the proper item to propagate the event
+                    QApplication::sendEvent(scene(), d->delayedPressEvent);
+                    d->clearDelayedPress();
+                    // continue on to handle mouse move event
+                }
+            }
             d->handleMouseMoveEvent(&mouseEvent);
             break;
         case QEvent::GraphicsSceneMousePress:
