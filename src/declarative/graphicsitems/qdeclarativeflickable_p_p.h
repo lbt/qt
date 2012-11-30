@@ -98,7 +98,7 @@ public:
 
     struct AxisData {
         AxisData(QDeclarativeFlickablePrivate *fp, void (QDeclarativeFlickablePrivate::*func)(qreal))
-            : move(fp, func), viewSize(-1), startMargin(0), endMargin(0)
+            : move(fp, func), viewSize(-1), startMargin(0), endMargin(0), origin(0)
             , smoothVelocity(fp), atEnd(false), atBeginning(true)
             , fixingUp(false), inOvershoot(false), moving(false), flicking(false)
             , dragging(false), extentsChanged(false)
@@ -131,6 +131,7 @@ public:
         qreal flickTarget;
         qreal startMargin;
         qreal endMargin;
+        qreal origin;
         QDeclarativeFlickablePrivate::Velocity smoothVelocity;
         QPODVector<qreal,10> velocityBuffer;
         bool atEnd : 1;

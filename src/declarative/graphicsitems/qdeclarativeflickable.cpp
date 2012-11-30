@@ -419,12 +419,20 @@ void QDeclarativeFlickablePrivate::updateBeginningEnd()
 
     if (vData.extentsChanged) {
         vData.extentsChanged = false;
-        emit q->originYChanged();
+        qreal newOrigin = q->originY();
+        if (newOrigin != vData.origin) {
+            vData.origin = newOrigin;
+            emit q->originYChanged();
+        }
     }
 
     if (hData.extentsChanged) {
         hData.extentsChanged = false;
-        emit q->originXChanged();
+        qreal newOrigin = q->originX();
+        if (newOrigin != hData.origin) {
+            hData.origin = newOrigin;
+            emit q->originXChanged();
+        }
     }
 
     if (atBoundaryChange)
