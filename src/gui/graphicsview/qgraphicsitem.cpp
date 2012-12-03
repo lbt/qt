@@ -3348,6 +3348,12 @@ void QGraphicsItem::clearFocus()
 */
 void QGraphicsItemPrivate::clearFocusHelper(bool giveFocusToParent)
 {
+    QGraphicsItem *subFocusItem = q_ptr;
+    if (flags & QGraphicsItem::ItemIsFocusScope) {
+        while (subFocusItem->d_ptr->focusScopeItem)
+            subFocusItem = subFocusItem->d_ptr->focusScopeItem;
+    }
+
     if (giveFocusToParent) {
         // Pass focus to the closest parent focus scope
         if (!inDestructor) {
@@ -3356,10 +3362,10 @@ void QGraphicsItemPrivate::clearFocusHelper(bool giveFocusToParent)
                 if (p->flags() & QGraphicsItem::ItemIsFocusScope) {
                     if (p->d_ptr->focusScopeItem == q_ptr) {
                         p->d_ptr->focusScopeItem = 0;
-                        if (!q_ptr->hasFocus()) //if it has focus, focusScopeItemChange is called elsewhere
+                        if (!subFocusItem->hasFocus()) //if it has focus, focusScopeItemChange is called elsewhere
                             focusScopeItemChange(false);
                     }
-                    if (q_ptr->hasFocus())
+                    if (subFocusItem->hasFocus())
                         p->d_ptr->setFocusHelper(Qt::OtherFocusReason, /* climb = */ false,
                                                  /* focusFromHide = */ false);
                     return;
@@ -3369,7 +3375,7 @@ void QGraphicsItemPrivate::clearFocusHelper(bool giveFocusToParent)
         }
     }
 
-    if (q_ptr->hasFocus()) {
+    if (subFocusItem->hasFocus()) {
         // Invisible items with focus must explicitly clear subfocus.
         clearSubFocus(q_ptr);
 
