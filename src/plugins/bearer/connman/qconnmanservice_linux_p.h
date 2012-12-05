@@ -59,6 +59,7 @@
 #include <QtDBus/QDBusInterface>
 #include <QtDBus/QDBusMessage>
 #include <QtDBus/QDBusReply>
+#include <QtDBus/QDBusArgument>
 
 #include <QtDBus/QDBusPendingCallWatcher>
 #include <QtDBus/QDBusObjectPath>
@@ -90,10 +91,18 @@
 
 QT_BEGIN_NAMESPACE
 
-QT_END_NAMESPACE
+struct ConnmanMap {
+    QDBusObjectPath objectPath;
+    QVariantMap propertyMap;
+};
+Q_DECLARE_METATYPE(QT_PREPEND_NAMESPACE(ConnmanMap));
 
+QDBusArgument &operator<<(QDBusArgument &argument, const ConnmanMap &obj);
+const QDBusArgument &operator>>(const QDBusArgument &argument, ConnmanMap &obj);
 
-QT_BEGIN_NAMESPACE
+typedef QList< ConnmanMap > ConnmanMapList;
+Q_DECLARE_METATYPE(QT_PREPEND_NAMESPACE(ConnmanMapList))
+
 
 class QConnmanManagerInterface : public  QDBusAbstractInterface
 {
