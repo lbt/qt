@@ -56,9 +56,24 @@
 #ifndef QT_NO_BEARERMANAGEMENT
 #ifndef QT_NO_DBUS
 
+QDBusArgument &operator<<(QDBusArgument &argument, const ObjectPathProperties &item)
+{
+    argument.beginStructure();
+    argument << item.path << item.properties;
+    argument.endStructure();
+    return argument;
+}
+
+const QDBusArgument &operator>>(const QDBusArgument &argument, ObjectPathProperties &item)
+{
+    argument.beginStructure();
+    argument >> item.path >> item.properties;
+    argument.endStructure();
+    return argument;
+}
+
 QT_BEGIN_NAMESPACE
 static QDBusConnection dbusConnection = QDBusConnection::systemBus();
-
 
 QOfonoManagerInterface::QOfonoManagerInterface( QObject *parent)
         : QDBusAbstractInterface(QLatin1String(OFONO_SERVICE),
@@ -66,6 +81,8 @@ QOfonoManagerInterface::QOfonoManagerInterface( QObject *parent)
                                  OFONO_MANAGER_INTERFACE,
                                  QDBusConnection::systemBus(), parent)
 {
+    qDBusRegisterMetaType<ObjectPathProperties>();
+    qDBusRegisterMetaType<PathPropertiesList>();
 }
 
 QOfonoManagerInterface::~QOfonoManagerInterface()
@@ -74,8 +91,16 @@ QOfonoManagerInterface::~QOfonoManagerInterface()
 
 QList <QDBusObjectPath> QOfonoManagerInterface::getModems()
 {
-    QVariant var = getProperty("Modems");
-    return qdbus_cast<QList<QDBusObjectPath> >(var);
+    QList <QDBusObjectPath> modemList;
+    QList<QVariant> argumentList;
+    QDBusReply<PathPropertiesList > reply = this->asyncCallWithArgumentList(QLatin1String("GetModems"), argumentList);
+    if(reply.isValid()) {
+        foreach(ObjectPathProperties modem, reply.value()) {
+            modemList << modem.path;
+        }
+    }
+
+    return modemList;
 }
 
 QDBusObjectPath QOfonoManagerInterface::currentModem()
@@ -359,8 +384,16 @@ QString QOfonoNetworkRegistrationInterface::getBaseStation()
 
 QList <QDBusObjectPath> QOfonoNetworkRegistrationInterface::getOperators()
 {
-    QVariant var = getProperty("Operators");
-    return qdbus_cast<QList <QDBusObjectPath> >(var);
+    QList <QDBusObjectPath> operatorList;
+    QList<QVariant> argumentList;
+    QDBusReply<PathPropertiesList > reply = this->asyncCallWithArgumentList(QLatin1String("GetOperators"),
+                                                                                argumentList);
+    if(reply.isValid()) {
+        foreach(ObjectPathProperties netop, reply.value()) {
+            operatorList << netop.path;
+        }
+    }
+    return operatorList;
 }
 
 void QOfonoNetworkRegistrationInterface::connectNotify(const char *signal)
@@ -631,8 +664,16 @@ QOfonoDataConnectionManagerInterface::~QOfonoDataConnectionManagerInterface()
 
 QList<QDBusObjectPath> QOfonoDataConnectionManagerInterface::getPrimaryContexts()
 {
-    QVariant var = getProperty("PrimaryContexts");
-    return qdbus_cast<QList<QDBusObjectPath> >(var);
+    QList <QDBusObjectPath> contextList;
+    QList<QVariant> argumentList;
+    QDBusReply<PathPropertiesList > reply = this->asyncCallWithArgumentList(QLatin1String("GetContexts"),
+                                                                         argumentList);
+    if(reply.isValid()) {
+        foreach(ObjectPathProperties context, reply.value()) {
+            contextList << context.path;
+        }
+    }
+    return contextList;
 }
 
 bool QOfonoDataConnectionManagerInterface::isAttached()
