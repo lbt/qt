@@ -4,7 +4,7 @@ contains(QT_CONFIG, dbus) {
     contains(QT_CONFIG, icd) {
         SUBDIRS += icd
     } else:linux* {
-        SUBDIRS += generic
+#        SUBDIRS += generic
         SUBDIRS += connman networkmanager
     }
 }
