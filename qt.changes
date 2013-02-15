@@ -1,0 +1,420 @@
+* Tue Jan 29 2013 Oleg Girko <ol+mer@infoserver.ru> - 4.8.3
+- Add default handling for any arch other than arm, i386 or mips.
+
+* Mon Nov 26 2012 Robin Burchell <robin+mer@viroteck.net> - 4.8.3
+- Enables a one second password echo delay for TextInput (from Andrew den Exeter)
+- QTBUG-28189: Nested flickables with pressDelay flick incorrect Flickable (from Martin Jones)
+- Revert 0013-Ensure-that-the-QDeclarativeText-painter-uses-the-co.patch and fix correctly (from Chris Adams)
+- Allow margin changes during Flickable drag operation, squashed into 0012-Backport-Flickable-margins.patch (from Matthew Vogt)
+
+* Mon Nov 12 2012 Robin Burchell <robin+mer@viroteck.net> - 4.8.3
+- Fixes MER#184: moc does timestamps in sources, causing unnecessary rebuilds
+
+* Mon Nov 12 2012 Robin Burchell <robin+mer@viroteck.net> - 4.8.3
+- Fixes MER#585: Enable QDeclarativeView flags to work around mcompositor flicker
+
+* Sun Nov 11 2012 Robin Burchell <robin+mer@viroteck.net> - 4.8.3
+- Update source URL & tarball location.
+- New version of 0012-Backport-Flickable-margins.patch, fixing viewport handling.
+  Superscedes Mer review 977.
+
+* Sat Nov 10 2012 Robin Burchell <robin+mer@viroteck.net> - 4.8.3
+- Update to upstream 4.8.3
+- Drop some plausibly fishy patches with no bug references:
+  qt-4.8.0-disable-subpixel-support-to-force-alpha-only-texture.patch
+  qt-4.8.0-add-bounds-checking-in-soft-scale.patch
+  qt-4.8.0-modify-alpha-checking-for-GlSurfaceCreateWithAlpha.patch
+  qt-4.8.0-set-alpha-flags-after-converto32-in-eglcreatesurface.patch
+  qt-4.8.0-Description-rewrite-INV_PREMUL-to-fix-a-glass-jaw-on.patch
+- Merge XI2 patches into a single patch for ease of application and history:
+  qt-4.8.0-xinput2-support.patch
+  qt-4.8.0-add-scaling-based-on-screen-size.patch
+  qt-4.8.0-Adapted-XInput2.0-code-to-support-multiple-connected.patch
+
+* Wed Nov 7 2012 Bea Lam <bea.lam@jollamobile.com> - 4.8.2
+- Backport some PathView properties and add Qt.weekNumber()
+
+* Fri Nov 2 2012 Chris Adams <chris.adams@jollamobile.com> - 4.8.2
+- Fix bugs in QDeclarativeText and ShaderEffectItem
+
+* Wed Oct 24 2012 Martin Jones <martin.jones@jollamobile.com> - 4.8.2
+- Backport QtQuick 2.0 dragging and margin properties.
+
+* Sat Apr 28 2012 Michael de Lang <kingoipo@gmail.com> - 4.8.2
+- Modified qt.yaml to include qnetworkfunctions_wince.h in rpm
+
+* Fri Apr 27 2012 Michael de Lang <kingoipo@gmail.com> - 4.8.2
+- Update to upstream 4.8.2
+- Drop qt-gui-4.8.1-fix-calligra-crash.patch (upstreamed)
+- Fixes MER#470 : update qt to 4.8.2
+
+* Fri Apr 20 2012 Maurice de la Ferté <Maurice.Ferte@basyskom.com> - 4.8.1
+- Update to upstream 4.8.1
+- Add qt-gui-4.8.1-fix-calligra-crash.patch
+
+* Wed Feb 08 2012 Carsten Munk <carsten@merproject.org> - 4.8.0
+- Add arch_arg for mips
+
+* Wed Jan 11 2012 Robin Burchell <robin+mer@viroteck.net> - 4.8.0
+- Update to upstream 4.8.0
+- Rename patches to better match packaging guidelines
+- Drop allow_environment_setting_of_runtimegraphicssystem.patch (upstreamed)
+- Drop fix_runtime_gs.patch (upstreamed)
+- Drop blacklist-fraudulent-comodo-certificates-patch.diff (previously upstreamed)
+- Fix qt_instdate being set to compile time, resulting in needless rebuilds
+
+* Thu Nov 17 2011 Robin Burchell <robin+meego@viroteck.net> - 4.8.0~rc1
+- Remove -fast from configure options. This isn't really fast for our purposes,
+  since we want to build everything at once.
+
+* Thu Nov 10 2011 Robin Burchell <robin+meego@viroteck.net> - 4.8.0~rc1
+- Patches allowing change of the runtimegraphicssystem from an environment
+  variable. This is useful for certain SGX boards that allocate a lot of RAM per
+  GL context without affecting other boards.
+
+* Wed Nov 09 2011 Carsten Munk <carsten@maemo.org> - 4.8.0~rc1
+- Upgrade to Qt 4.8.0-rc1, drop qvfb and update xinput2 patch
+
+* Sat Oct 15 2011 Carsten Munk <carsten@maemo.org> - 4.8.0~beta1
+- Change i586 into %{ix86} because of i486
+
+* Fri Oct 14 2011 Marko Saukko <marko.saukko@cybercom.com> - 4.8.0~beta1
+- Added keepstatic macro and %{_libdir}/libQtUiTools.a file to rpm.
+
+* Fri Oct 07 2011 Carsten Munk <carsten@maemo.org> - 4.8.0~beta1 
+- Disable phonon
+
+* Wed Aug 03 2011 Markus Lehtonen <markus.lehtonen@linux.intel.com> - 4.8.0~beta1
+- Version bump to 4.8.0~beta1
+
+* Tue Aug 02 2011 Juan Zhao <juan.j.zhao@intel.com> - 4.8.0~tp
+- Fix QX11PixmapData's flags should be correct set when converted to 32 depth 
+  in EGLcreatesurface(BMC#21995)
+
+* Fri Jul 29 2011 Juan Zhao <juan.j.zhao@intel.com> - 4.8.0~tp
+- Fix grammar error for checking hasAlpha == (pixmapData->flags & 
+  QX11PixmapData::GlSurfaceCreatedWithAlpha)(BMC#21939)
+
+* Fri Jul 15 2011 Juan Zhao <juan.j.zhao@intel.com> - 4.8.0~tp
+- Fix Segment fault inside "qt_scale_image_argb32_on_argb32"(BMC#21182) 
+
+* Wed Jun 22 2011 Markus Lehtonen <markus.lehtonen@linux.intel.com> - 4.8.0~tp
+- Version bump to 4.8.0~tp
+- Convert packaging to use Spectacle
+
+* Thu May 05 2011 Fathi Boudra <fboudra@gmail.com> - 4.7.3
+- New upstream release
+- Remove blacklist-fraudulent-comodo-certificates-patch.diff - merged upstream
+
+* Tue May 03 2011 Shenghua Liu <shenghua.liu@digia.com> - 4.7.2
+- Fix Qt application with window transparency potentially seg faults
+  (BMC#13776)
+
+* Tue Apr 26 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.2
+- Fix incorrect dependencies to libEGL and libGLESv2 development libraries
+  (BMC#15413)
+
+* Tue Apr 19 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.2
+- Revert force_cxxflags_on_armv7l as requested by Carsten Munk
+- Remove chkconfig Requires. As a consequence, update-alternatives can't be
+  used anymore to set default Qt settings (BMC#16115)
+
+* Tue Apr 19 2011 Shenghua Liu <shenghua.liu@digia.com> - 4.7.2
+- Add Prevent_recursion_when_creating_window_surface.patch (BMC#12929)
+  to avoid a crash when MeeGoGraphicsSystem is used
+
+* Fri Apr 15 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.2
+- Enable multi-point touch patches on ARM (BMC#14982)
+- Remove 16_force_cxxflags_on_arm.patch as armv7l scheduler will be disabled
+  by the end of April 2011 in favor of armv7hl architecture
+
+* Wed Apr 13 2011 Joonas Tanskanen <joonas.tanskanen@sasken.com> - 4.7.2
+- Add BMC15323_add_support_for_QT_USE_DRAG_DISTANCE_env_var.patch (BMC#15323)
+  enables configuring of default value for startDragDistance property of
+  QApplication by defining QT_USE_DRAG_DISTANCE environment variable.
+
+* Mon Apr 13 2011 Juan Zhao <juan.j.zhao@intel.com> - 4.7.2
+- Add BMC15945_update_createwindow_in_qgl_x11egl.patch (BMC#15945)
+  Update XCreateWindow parameters to add colormap
+- Add patches (cherry-picked upstream):
+  Improve-performance-of-partial-updates-in-raster-win.patch 
+  Fix_transformIsSimple_in_QGraphicsScene.patch
+  Micro-optimization_for_QSpanData.patch
+  Some_Optimizations_for_the_gray_raster.patch
+  QTBUG-14901_Make_use_of_the_fast_image_paths.patch
+
+* Tue Apr 05 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.2
+- Update BMC5616_fix_GL_problems_on_stock_1.4_SGX_drivers.patch
+  to check for EGL_NOK_image_shared
+- Add blacklist-fraudulent-comodo-certificates-patch.diff: blacklist fake
+  certificates and abort an SSL handshake with entities that present these
+  certificates.
+
+* Fri Mar 25 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.2
+- Add Fixed_missing_text_when_using_static_text_items_in_GL_2_engine.patch
+  (BMC#14266)
+
+* Wed Mar 16 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.2
+- Update adapt_XInput2.0_code_to_support_multiple_devices.patch causing asserts
+  when using a debug build - Thanks to James Ketreno (BMC#13837)
+- Remove 02_qmake_lflags_as-needed.patch - configure script supports LDFLAGS.
+
+* Fri Mar 11 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.2
+- Add Fix_builds_with_compilers_without_--with-fpu_neon_as_default.patch
+  NEON_SOURCES would be (incorrectly) compiled without -mfpu=neon, resulting in
+  build failure. This also moves -mfpu=neon after CXXFLAGS, as CXXFLAGS may
+  contain -mfpu=vfpv3-d16
+- Add BMC5616_fix_GL_problems_on_stock_1.4_SGX_drivers.patch (BMC#5616)
+  Force enable brokenFBOReadBack on stock 1.4 SGX drivers as this is apparently
+  not fixed on these drivers
+
+* Tue Mar 01 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.2
+- New upstream release (BMC#9100, BMC#13278)
+- Remove patches (included in Qt 4.7.2):
+  add_lib_to_openssl_search_path.patch
+  remove_useless_opengl_config.patch
+  QTBUG-13740_Make_QStaticText_honor_QPainter_pen_for_rich_text_on_X11.patch
+  QTBUG-12861_Fixed_stencil_buffer_on_FBOs_with_OpenGL_ES.patch
+  QTBUG-12865_Do_not_pretend_to_support_single_buffered_EGL_surfaces.patch
+  Only_set_maskTexture_sampler_uniform_once.patch
+  Minimize_parameter_changes_on_glyph_cache_textures.patch
+  Fix_text_rendering_in_GL_when_using_the_broken-fbo-fallback.patch
+  QTBUG-15163_Do_not_set_-mfpu_neon_globally_if_the_compiler_supports_neon.patch
+  QT-4162_Fix_possible_missing_glyphs_in_text_when_using_GL_engine.patch
+  QTBUG-15320_Prevent_crash_in_GL_2_engine_when_stroking_null_rectangle.patch
+  QT-3971_Fix_possible_corrupted_text_when_gl_glyph_cache_becomes_full.patch
+  QT-3971_Fix_possible_missing_glyphs_in_raster_engine_glyph_cache.patch
+  QTBUG-14806_Fix_possible_artifacts_under_glyphs_in_texture_glyph_cache.patch
+  QTBUG-15695_Correctly_handle_CppOwnership_even_when_a_QDeclarativeData_does_not_exist.patch
+  QTBUG-15697_Correct_ownership_semantics_for_QObject_derived_types.patch
+  QTBUG-15789_Fix_text_disappearing_on_GL_when_RGB-path_is_taken.patch
+  QT-3971_Do_not_delete_FBO_when_resetting_glyph_cache.patch
+  QT-3971_Add_work_around_for_bug_when_painting_w_glTexSubImage_into_large_texture.patch
+  QTBUG-14836_remove_the_connecting_thread_and_use_async_call_to_dbus_instead.patch
+  QTBUG-15775_Fix_ConnMan_bearer_plugin_to_use_new_net_connman_service_name.patch
+  Fix_regression_in_text_rendering_in_OpenGL2_engine.patch
+
+* Tue Feb 22 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.1
+- Add BMC13603_temp_path.patch: hardcode TMPDIR to /var/tmp and avoid to
+  corrupt the cache in MTF (BMC#13603)
+- Add Fix_regression_in_text_rendering_in_OpenGL2_engine.patch: a regression
+  was introduced by fixing a typo in the QT_OPENGL_ES_2 macro. This caused a
+  broken and untested code path to be used in the GLES2 case.
+
+* Thu Feb 03 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.1
+- Re-add add_nostrip_for_debug_packages.patch (BMC#13186)
+
+* Tue Feb 01 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.1
+- Disable multi-point touch patches on ARM to work around touch screen issue
+  (BMC#10147)
+
+* Mon Jan 17 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.1
+- Add upstream patches to support ConnMan >= 0.64:
+  QTBUG-14836_remove_the_connecting_thread_and_use_async_call_to_dbus_instead.patch
+  QTBUG-15775_Fix_ConnMan_bearer_plugin_to_use_new_net_connman_service_name.patch
+
+* Fri Jan 14 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.1
+- Add disable_subpixel_support_to_force_alpha-only_texture.patch (BMC#11826)
+  Thanks to Andy Ross
+- Add upstream patches related to glyph cache: QT-3971, QT-4162, QTBUG-14806
+
+* Fri Jan 14 2011 Stefano Pironato <stefano.pironato@nokia.com> - 4.7.1
+- Add multi-point touch support through the XInput2 API (BMC#11625)
+- Add -xinput2 configure option
+
+* Thu Jan 13 2011 James Ketreno <jketreno@linux.itel.com> - 4.7.1
+- Add scaling based on screen size to xinput2 (BMC#11625)
+- Adapt xinput2 code to support multiple devices (BMC#11625)
+
+* Tue Jan 11 2011 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.1
+- Add armv7hl, armv7nhl, armv7thl and armv7tnhl arch_arg support (BMC#12129)
+
+* Wed Dec 29 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.1
+- Add xdg-utils Requires to QtGui. QDesktopServices uses xdg-open (BMC#11418)
+
+* Mon Dec 20 2010 Yan Li <yan.i.li@intel.com> - 4.7.1
+- Don't use find's -executable option, which can't be found in old
+  versions of find (part of FEA#11589)
+
+* Wed Dec 15 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.1
+- Re-enable debug packages
+- Remove 05_add_nostrip_for_debug_packages.patch - deprecated (BMC#11308)
+
+* Tue Dec 07 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.1
+- Add upstream patches:
+  QTBUG-13740_Make_QStaticText_honor_QPainter_pen_for_rich_text_on_X11.patch
+  QTBUG-12861_Fixed_stencil_buffer_on_FBOs_with_OpenGL_ES.patch
+  QTBUG-12865_Do_not_pretend_to_support_single_buffered_EGL_surfaces.patch
+  QTBUG-15320_Prevent_crash_in_GL_2_engine_when_stroking_null_rectangle.patch
+  QTBUG-15695_Correctly_handle_CppOwnership_even_when_a_QDeclarativeData_does_not_exist.patch
+  QTBUG-15697_Correct_ownership_semantics_for_QObject_derived_types.patch
+  QTBUG-15789_Fix_text_disappearing_on_GL_when_RGB-path_is_taken.patch (BMC#10120)
+
+* Wed Nov 10 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.1
+- Update to Qt 4.7.1 - Enable GLES only build
+- Add Qt directories to qmake macros (%{_qt_*dir})
+- Remove patches:
+  10_webkit_self_injection_into_qt_configuration.patch - cherry-picked upstream
+  13_connman_backend_for_bearer_management.patch - cherry-picked upstream
+- Add patches:
+  add_lib_to_openssl_search_path.patch - on MeeGo, OpenSSL library
+  is installed under /lib (BMC#7777)
+  remove_useless_opengl_config.patch - Qt Declarative doesn't need opengl
+- Update libqtnetwork4 package: add libqconnmanbearer.so file
+- Add Qt MeeGo graphics system helper to Qt OpenGl package (it requires GLESv2
+  and EGL, only available on ARM)
+- Remove QT_RX71_MULTITOUCH=1 configure option to use X input devices
+  (BMC#8025)
+- Replace -dbus configure option by -dbus-linked to link against dbus library
+  instead of dlopen it
+
+* Mon Sep 20 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.0
+- Update to 4.7.0 (BMC#2610)
+- Remove patches:
+  12_fix_qstatictext_with_opengl1_engine.patch - stolen upstream (BMC#5948)
+  14_add_three_new_style-hints_to_qfont.patch - stolen upstream
+  15_fix_qstatictext_copy_constructor.patch - stolen upstream
+
+* Sat Sep 11 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.0~rc1
+- Add QMAKE_CFLAGS_DEBUG and QMAKE_CXXFLAGS_DEBUG to the forced flags on ARM
+  and to QMake macros
+
+* Wed Sep 08 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.0~rc1
+- Add 16_force_cxxflags_on_arm.patch:
+  CFLAGS/CXXFLAGS environment variables  are not used by QMake based projects.
+  This is a workaround until the affected packages are fixed.
+
+* Mon Sep 06 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.0~rc1
+- Add -arch armv6 usage on armv7l architecture.
+
+* Sat Sep 04 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.0~rc1
+- Add 14_add_three_new_style-hints_to_qfont.patch
+  Add three new style-hints to QFont to match CSS generic font families
+- Add 15_fix_qstatictext_copy_constructor.patch
+  Fix QStaticText copy constructor to also copy text option property
+
+* Fri Sep 03 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.0~rc1
+- Disable/comment Qt Openvg module support
+  (it pulls EGL, causing a crash in mcompositor)
+
+* Thu Sep 02 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.0~rc1
+- Add Connman backend for Bearer Management
+  (13_connman_backend_for_bearer_management.patch.bz2)
+
+* Thu Aug 19 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.0~rc1
+- Update to Qt 4.7.0 rc1
+- Add arch_arg to prepare -arch armv6 usage on armv7l architecture
+- Add BuildRequires on pkgconfig(egl), pkgconfig(vg) and pass -openvg configure
+  option to enable Qt OpenVG module (BMC#3136)
+- Update files installed
+- Replace 10_add_webkit_qt_config.patch by 
+  10_webkit_self_injection_into_qt_configuration.patch
+- Drop Qt3Support: pass -no-qt3support configure option
+- Add 12_fix_qstatictext_with_opengl1_engine.patch (BMC#5948)
+  Like OpenGL2 and OpenVG, the OpenGL1 paint engine also transforms text 
+  coordinates itself and does not require QStaticText to use device 
+  coordinates
+
+* Mon Aug 16 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.0~prerelease+beta2
+- Add QMake macros for rpm
+
+* Thu Aug 12 2010 Kaitlin Rupert <kaitlin.rupert@intel.com> - 4.7.0~prerelease+beta2
+- Fix BMC #4992 - look for icons in /usr/share/pixmaps
+
+* Wed Jul 14 2010 Fathi Boudra <fathi.boudra@nokia.com> - 4.7.0~prerelease+beta2
+- Rewrite from scratch for MeeGo - Split packages/modules
+- Add patches:
+  01_configure_quilt_compat.patch
+  02_qmake_lflags_as-needed.patch
+  03_config_tests_sqlite.patch
+  04_build_translations.patch
+  05_add_nostrip_for_debug_packages.patch
+  06_install_qvfb.patch
+  10_add_webkit_qt_config.patch
+- Remove phonon related patches. They should be reviewed/ported to phonon
+  standalone package:
+  qt-x11-opensource-src-4.5.1-phonon.patch
+  qt-x11-opensource-src-4.5.1-pulseaudio.patch
+  qt-everywhere-opensource-src-4.6.0-gst-pulseaudio.patch
+- Remove deprecated/useless patches:
+  qt-x11-opensource-src-4.5.0-fix-qatomic-inline-asm.patch
+  qt-x11-opensource-src-4.5.3-system_ca_certificates.patch - fixed upstream
+  qt-everywhere-opensource-src-4.6.0-beta1-qdoc3.patch - fixed upstream
+- Disable texture_enable_fix.patch - (partly)s fixed upstream
+- Remove widgets QML plugin - it doesn't exist anymore
+- Add folderlistmodel and gestures QML plugins
+- Remove -no-mediaservices configure option - it doesn't exist anymore
+- Remove leftover directories on install
+- Update installed files
+- Use update-alternatives to manage Trolltech.conf file
+- Rename qt-netbook package to qt-netbook-settings.
+- Remove pulseaudio-devel BuildRequires. Phonon is shipped "standalone".
+
+* Tue Jun 29 2010 Kaitlin Rupert <kaitlin.rupert@intel.com> - 4.7.0
+- Fix BMC #17 - create a netbook specific package that adds the GTK style
+- Fix BMC #3183 - this patch has been pushed upstream, but is needed to fix
+  the bindTexture() call in 4.7 pre-release
+
+* Mon Jun 28 2010 Li Peng <peng.li@intel.com> - 4.7.0
+- Remove dependency on libXinerama
+
+* Fri Jun 18 2010 Kaitlin Rupert <kaitlin.rupert@intel.com> - 4.7.0
+- Remove a number of obsolete patches:
+  0001-This-patch-uses-object-name-as-a-fallback-for-window.patch
+  0002-This-patch-makes-override-redirect-windows-popup-men.patch
+  0003-This-patch-changes-QObjectPrivateVersion-thus-preven.patch
+  0004-This-patch-adds-support-for-using-isystem-to-allow-p.patch
+  0005-When-tabs-are-inserted-or-removed-in-a-QTabBar.patch
+  0006-Fix-configure.exe-to-do-an-out-of-source-build-on-wi.patch
+  0007-When-using-qmake-outside-qt-src-tree-it-sometimes-ge.patch
+  0008-This-patch-makes-the-raster-graphics-system-use-shar.patch
+  0009-Restore-a-section-of-the-file-that-got-removed-due-t.patch
+  0012-Add-context-to-tr-calls-in-QShortcut.patch
+  qt-4.5-sparc64.patch
+  qt-all-opensource-src-4.4.0-rc1-as_IN-437440.patch
+  qt-x11-opensource-src-4.2.2-multilib-QMAKEPATH.patch
+  qt-x11-opensource-src-4.2.2-multilib-optflags.patch
+  qt-x11-opensource-src-4.5.0-gcc_hack.patch
+  qt-x11-opensource-src-4.5.1-enable_ft_lcdfilter.patch
+  qt-x11-opensource-src-4.5.1-kde4_plugins.patch
+  qt-x11-opensource-src-4.5.1-mysql_config.patch
+- Fix BMC #2009 - have devel package require gcc-c++
+- Add fdupes to spec file to clean up duplicate files
+- Remove duplicate freetype-devel BuildRequires
+
+* Wed Apr 28 2010 Kaitlin Rupert <kaitlin.rupert@intel.com> - 4.7.0
+- Update to 4.7.0 pre-release
+- Spec Cleanup: Removed exraneous comments
+
+* Fri Apr 16 2010 Kaitlin Rupert <kaitlin.rupert@intel.com> - 4.6.1
+- BMC 52: Don't show Assistant, Designer, Linguist, and Config icons on handset
+
+* Thu Apr 15 2010 Carsten V. Munk <carsten@maemo.org> - 4.6.1
+- For ARM, default to gles2 and include needed libraries and headers.
+
+* Thu Apr 08 2010 Kaitlin Rupert <kaitlin.rupert@intel.com> - 4.6.1
+- BMC 423 - add QT bin install location to path 
+
+* Mon Mar 01 2010 Li Peng <peng.li@intel.com> - 4.6.1
+- qt texture enable fix for netbook
+
+* Mon Feb 15 2010 Arjan van de Ven <arjan@linux.intel.com> - 4.6.1
+- rewrite INV_PREMUL to fix a glass jaw on Atom
+
+* Sun Jan 24 2010 Anas Nashif <anas.nashif@intel.com> - 4.6.1
+- Update to 4.6.1
+
+* Wed Sep 09 2009 Xu Li <xu.li@intel.com> 4.5.0
+- Add CVE-2009-2700.Qt-4.5.x.patch to address CVE-2009-2700 (MB#5813)
+
+* Wed Jul 01 2009 Xu Li <xu.li@intel.com> 4.5.0
+- Add CVE-2009-0945.Qt-4.5.x.patch to address CVE-2009-0945
+
+* Tue May 12 2009 Anas Nashif <anas.nashif@intel.com> 4.5.0
+- Build with dbus
+
+* Wed Apr 22 2009 Anas Nashif <anas.nashif@intel.com> 4.5.0
+- remove phonon dependency
+
+* Tue Apr 07 2009 Anas Nashif <anas.nashif@intel.com> 4.5.0
+- Update to 4.5.0

@@ -1,0 +1,1518 @@
+Name: qt
+Summary: Cross-platform application and UI framework
+Version: "%{rpm_version}"
+Release: 1
+Group: Qt/Qt
+License: LGPLv2.1 with exception or GPLv3
+URL: http://qt-project.org
+Sources:
+    - http://releases.qt-project.org/qt4/source/%{name}-everywhere-opensource-src-%{upstream_version}.tar.gz
+    - assistant.desktop
+    - designer.desktop
+    - linguist.desktop
+    - qtdemo.desktop
+    - assistant.png
+    - designer.png
+    - linguist.png
+    - qtdemo.png
+    - macros.qmake
+    - "%{name}-rpmlintrc"
+    - qt.changes
+
+Patches:
+- 0001-Description-Avoid-.pc-directories-created-by-quilt.-.patch
+- 0002-Description-Fix-sqlite-config.test.patch
+- 0003-Description-translations-fails-to-build-under-autobu.patch
+- 0004-Description-send-Q_ASSERT-qDebug-qWarning-and-qFatal.patch
+- 0005-Description-MISSING-BMC-3183-QTBUG-11158-QTBUG-11462.patch
+- 0006-Description-Make-it-so-that-the-QIcon-loader-honors-.patch
+- 0007-xinput2-support.patch
+- 0008-Avoid-symbol-stripping-by-default.patch
+- 0009-Hardcode-TMPDIR-to-var-tmp-BMC-13603.patch
+- 0010-BMC-15323-add-support-for-QT_USE_DRAG_DISTANCE-envir.patch
+- 0011-Backport-Flickable-dragging-properties.patch
+- 0012-Backport-Flickable-margins.patch
+- 0013-Observe-GL-context-loss-in-ShaderEffectItem.patch
+- 0014-Add-Qt.weekNumber.patch
+- 0015-Backport-PathView-snapMode-dragging-and-maximumFlick.patch
+- 0016-Fixes-MER-585-Enable-QDeclarativeView-flags-to-work-.patch
+- 0017-Ensure-QDeclarativeTextLayout-uses-the-correct-pen.patch
+- 0018-Nested-Flickables-with-pressDelay-flick-incorrect-Fl.patch
+- 0019-Enable-password-echo-delay-for-TextInput.patch
+- 0020-Do-not-emit-origin-X-Y-Changed-unnecessarily.patch
+- 0021-Clear-focus-of-GraphicsItem-focus-scopes-and-their-c.patch
+- 0022-Backport-PathView-currentIndex-fixes-from-Qt-5.patch
+- 0023-fix-connman-bearer-for-new-API.patch
+- 0024-Disable-generic-bearer-plugin.patch
+- 0025-update-ofono-API.patch
+- 0026-Don-t-update-the-input-method-if-the-im-hints-haven-.patch
+- 0027-Fix-TextInput-test-failures.patch
+- 0028-Remove-the-timestamp-info-in-generated-files.patch
+
+Description: |
+    Qt is a cross-platform application and UI framework. Using Qt, you can write
+    web-enabled applications once and deploy them across desktop, mobile and
+    embedded operating systems without rewriting the source code.
+
+PkgBR:
+    - cups-devel
+    - fdupes
+    - flex
+    - gcc-c++
+    - libjpeg-devel
+    - libmng-devel
+    - libtiff-devel
+    - pam-devel
+    - readline-devel
+    - sharutils
+PkgConfigBR:
+    - alsa
+    - dbus-1
+    - egl
+    - freetype2
+    - glesv2
+    - glib-2.0
+    - gstreamer-0.10
+    - gstreamer-plugins-base-0.10
+    - ice
+    - libpng
+    - libxslt
+    - openssl
+    - sm
+    - sqlite3
+    - x11
+    - xcursor
+    - xext
+    - xft
+    - xi
+    - xinerama
+    - xmu
+    - xrandr
+    - xrender
+    - xt
+    - xtst
+    - xv
+    - zlib
+SetupOptions: -q -n %{name}-everywhere-opensource-src-%{upstream_short_version}
+Configure: fooconfigure
+ConfigOptions:
+# Below: rude hack to overcome stupidness of specify
+    - ./configure
+    - -runtimegraphicssystem raster
+    - -graphicssystem runtime
+    - -confirm-license
+    - -platform linux-g++
+    - -prefix "%{_prefix}"
+    - -bindir "%{_bindir}"
+    - -libdir "%{_libdir}"
+    - -docdir "%{_docdir}/qt4"
+    - -headerdir "%{_includedir}/qt4"
+    - -datadir "%{_datadir}/qt4"
+    - -plugindir "%{_libdir}/qt4/plugins"
+    - -importdir "%{_libdir}/qt4/imports"
+    - -translationdir "%{_datadir}/qt4/translations"
+    - -sysconfdir "%{_sysconfdir}/xdg"
+    - -demosdir "%{_libdir}/qt4/demos"
+    - -examplesdir "%{_libdir}/qt4/examples"
+    - -opensource
+    - -no-sql-ibase
+    - -no-sql-mysql
+    - -no-sql-odbc
+    - -no-sql-psql
+    - -plugin-sql-sqlite
+    - -no-sql-sqlite2
+    - -no-sql-tds
+    - -system-sqlite
+    - -no-qt3support
+    - -xmlpatterns
+    - -no-multimedia
+    - -audio-backend
+    - -no-phonon
+    - -no-phonon-backend
+    - -svg
+    - -no-webkit
+    - -script
+    - -scripttools
+    - -system-zlib
+    - -system-libtiff
+    - -system-libpng
+    - -system-libjpeg
+    - -no-rpath
+    - -optimized-qmake
+    - -dbus-linked
+    - -no-separate-debug-info
+    - -verbose
+    - -no-nas-sound
+    - -opengl es2
+    - -arch %{arch_arg}
+    - -no-openvg
+    - -lfontconfig
+    - -I/usr/include/freetype2
+    - ix86:-xinput2
+Builder: make
+SubPackages:
+    - Name: libqtgui4
+      AsWholeName: yes
+      Summary: Qt GUI module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtGui module extends QtCore with GUI functionality.
+      AutoDepend: no
+      Requires:
+          - xdg-utils
+      Provides:
+          - "%{name}-x11 = %{version}-%{release}"
+      Obsoletes:
+          - "%{name}-x11 < %{version}-%{release}"
+      Files:
+          - "%config %{_sysconfdir}/xdg/Trolltech-default.conf"
+          - "%{_libdir}/libQtGui.so.*"
+          - "%{_libdir}/qt4/plugins/accessible/libqtaccessiblewidgets.so"
+          - "%{_libdir}/qt4/plugins/graphicssystems/libqtracegraphicssystem.so"
+          - "%{_libdir}/qt4/plugins/imageformats/libqgif.so"
+          - "%{_libdir}/qt4/plugins/imageformats/libqico.so"
+          - "%{_libdir}/qt4/plugins/imageformats/libqjpeg.so"
+          - "%{_libdir}/qt4/plugins/imageformats/libqmng.so"
+          - "%{_libdir}/qt4/plugins/imageformats/libqtiff.so"
+          - "%{_libdir}/qt4/plugins/imageformats/libqtga.so"
+          - "%{_libdir}/qt4/plugins/inputmethods/libqimsw-multi.so"
+
+    - Name: qmake
+      Summary: Qt qmake Makefile generator tool
+      Group: Development/Tools
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains Qt qmake, a tool that helps simplify the build process
+          for development project across different platforms. qmake automates the
+          generation of Makefiles so that only a few lines of information are needed to
+          create each Makefile. qmake can be used for any software project, whether it is
+          written using Qt or not.
+          
+          Qt qmake requires a platform and compiler description file which contains many
+          default values used to generate appropriate Makefiles.
+          
+          This package contains also these platform specifications.
+      AutoDepend: no
+      Files:
+          - "%config(noreplace) %{_sysconfdir}/rpm/macros.qmake"
+          - "%{_bindir}/qmake"
+          - "%{_datadir}/qt4/mkspecs/"
+
+
+    - Name: demos
+      Summary: Qt examples and demos
+      Group: Documentation
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains Qt examples and demos.
+      AutoDepend: no
+      RequiresPost:
+          - desktop-file-utils
+      RequiresPostUn:
+          - desktop-file-utils
+      Files:
+          - "%{_bindir}/qtdemo"
+          - "%{_libdir}/qt4/demos/"
+          - "%{_libdir}/qt4/examples/"
+          - "%{_libdir}/qt4/plugins/designer/libarthurplugin.so"
+          - "%{_libdir}/qt4/plugins/designer/libcontainerextension.so"
+          - "%{_libdir}/qt4/plugins/designer/libcustomwidgetplugin.so"
+          - "%{_libdir}/qt4/plugins/designer/libtaskmenuextension.so"
+          - "%{_libdir}/qt4/plugins/designer/libworldtimeclockplugin.so"
+          - "%{_datadir}/applications/qtdemo.desktop"
+          - "%{_datadir}/pixmaps/qtdemo.png"
+
+    - Name: libqtcore4
+      AsWholeName: yes
+      Summary: Qt core module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtCore module contains core non-GUI functionality.
+      AutoDepend: no
+      Provides:
+          - "%{name} = %{version}-%{release}"
+      Obsoletes:
+          - "%{name} < %{version}-%{release}"
+      Files:
+          - "%doc LGPL_EXCEPTION.txt"
+          - "%{_libdir}/libQtCLucene.so.*"
+          - "%{_libdir}/libQtCore.so.*"
+          - "%{_libdir}/qt4/plugins/codecs/*.so"
+          - "%{_datadir}/qt4/translations/qt_ar.qm"
+          - "%{_datadir}/qt4/translations/qt_cs.qm"
+          - "%{_datadir}/qt4/translations/qt_da.qm"
+          - "%{_datadir}/qt4/translations/qt_de.qm"
+          - "%{_datadir}/qt4/translations/qt_es.qm"
+          - "%{_datadir}/qt4/translations/qt_fa.qm"
+          - "%{_datadir}/qt4/translations/qt_fr.qm"
+          - "%{_datadir}/qt4/translations/qt_gl.qm"
+          - "%{_datadir}/qt4/translations/qt_he.qm"
+          - "%{_datadir}/qt4/translations/qt_hu.qm"
+          - "%{_datadir}/qt4/translations/qt_lt.qm"
+          - "%{_datadir}/qt4/translations/qt_ja.qm"
+          - "%{_datadir}/qt4/translations/qt_ko.qm"
+          - "%{_datadir}/qt4/translations/qt_pl.qm"
+          - "%{_datadir}/qt4/translations/qt_pt.qm"
+          - "%{_datadir}/qt4/translations/qt_ru.qm"
+          - "%{_datadir}/qt4/translations/qt_sk.qm"
+          - "%{_datadir}/qt4/translations/qt_sl.qm"
+          - "%{_datadir}/qt4/translations/qt_sv.qm"
+          - "%{_datadir}/qt4/translations/qt_uk.qm"
+          - "%{_datadir}/qt4/translations/qt_zh_CN.qm"
+          - "%{_datadir}/qt4/translations/qt_zh_TW.qm"
+
+    - Name: qmlviewer
+      Summary: Qt QML viewer
+      Group: Development/Tools
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains Qt QML viewer (qml). It allows to view QML files.
+      AutoDepend: no
+      Files:
+          - "%{_bindir}/qmlviewer"
+
+    - Name: libqtsql4-sqlite
+      AsWholeName: yes
+      Summary: Qt SQLite 3 database driver
+      Group: Qt/Qt
+      Description: |
+          This package contains the SQLite 3 plugin for Qt.
+          
+          Install it if you intend to use or write Qt programs that are to access an
+          SQLite 3 DB.
+      AutoDepend: no
+      Provides:
+          - "%{name}-sqlite = %{version}-%{release}"
+      Obsoletes:
+          - "%{name}-sqlite < %{version}-%{release}"
+      Files:
+          - "%{_libdir}/qt4/plugins/sqldrivers/libqsqlite.so"
+
+    - Name: doc-html
+      Summary: Qt API documentation (HTML format)
+      Group: Documentation
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains the complete Qt 4 API documentation (HTML format).
+          
+          The documentation is provided in HTML format.
+      AutoDepend: no
+      BuildArch: noarch
+      Files:
+          - "%doc %{_docdir}/qt4/html/"
+
+    - Name: libqtdeclarative4
+      AsWholeName: yes
+      Summary: Qt Declarative module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The Qt Declarative module provides a declarative framework for building highly
+          dynamic, custom user interfaces.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtDeclarative.so.*"
+          - "%{_libdir}/qt4/plugins/designer/libqdeclarativeview.so"
+          - "%{_libdir}/qt4/plugins/qmltooling/libqmldbg_tcp.so"
+          - "%{_libdir}/qt4/plugins/qmltooling/libqmldbg_inspector.so"
+
+    - Name: libqtdbus4
+      AsWholeName: yes
+      Summary: Qt D-Bus module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtDBus module is a Unix-only library that you can use to make Inter-Process
+          Communication using the D-Bus protocol.
+          
+          Applications using the QtDBus module can provide services to other, remote
+          applications by exporting objects, as well as use services exported by those
+          applications by placing calls and accessing properties.
+      AutoDepend: no
+      Files:
+          - "%{_bindir}/qdbus"
+          - "%{_libdir}/libQtDBus.so.*"
+
+    - Name: designer
+      Summary: Graphical designer for Qt applications
+      Group: Development/Tools
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          Qt Designer is a tool for designing and building graphical user interfaces
+          (GUIs) from Qt components.
+      AutoDepend: no
+      RequiresPost:
+          - desktop-file-utils
+      RequiresPostUn:
+          - desktop-file-utils
+      Files:
+          - "%{_bindir}/designer"
+          - "%{_datadir}/applications/designer.desktop"
+          - "%{_datadir}/pixmaps/designer.png"
+          - "%{_datadir}/qt4/translations/designer_*.qm"
+
+    - Name: libqttest4
+      AsWholeName: yes
+      Summary: Qt test module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtTest module provides classes for unit testing Qt applications and
+          libraries.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtTest.so.*"
+          
+    - Name: libqtxmlpatterns4
+      AsWholeName: yes
+      Summary: Qt XML patterns module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          QtXmlPatterns is a XQuery and XPath engine for XML and custom data models.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtXmlPatterns.so.*"
+
+    - Name: libqt-devel
+      AsWholeName: yes
+      Summary: Qt development files
+      Group: Development/Libraries
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains the development header files and development programs
+          used for building Qt applications.
+      AutoDepend: no
+      Requires:
+          - "%{name}-qmake = %{version}-%{release}"
+          - libqtcore4 = %{version}-%{release}
+          - libqtdbus4 = %{version}-%{release}
+          - libqtdeclarative4 = %{version}-%{release}
+          - libqtdesigner4 = %{version}-%{release}
+          - libqtgui4 = %{version}-%{release}
+          - libqthelp4 = %{version}-%{release}
+          - libqtnetwork4 = %{version}-%{release}
+          - libqtscript4 = %{version}-%{release}
+          - libqtscripttools4 = %{version}-%{release}
+          - libqtsql4 = %{version}-%{release}
+          - libqtsvg4 = %{version}-%{release}
+          - libqttest4 = %{version}-%{release}
+          - libqtxml4 = %{version}-%{release}
+          - libqtxmlpatterns4 = %{version}-%{release}
+      Provides:
+          - "%{name}-devel = %{version}-%{release}"
+      Obsoletes:
+          - "%{name}-devel < %{version}-%{release}"
+          - "%{name}4-devel < %{version}-%{release}"
+      Files:
+          - "%{_bindir}/lrelease"
+          - "%{_bindir}/lupdate"
+          - "%{_bindir}/moc"
+          - "%{_bindir}/qdbuscpp2xml"
+          - "%{_bindir}/qdbusxml2cpp"
+          - "%{_bindir}/qt3to4"
+          - "%{_bindir}/rcc"
+          - "%{_bindir}/uic"
+          - "%{_includedir}/qt4/Qt/QtCore"
+          - "%{_includedir}/qt4/Qt/QtDBus"
+          - "%{_includedir}/qt4/Qt/QtDeclarative"
+          - "%{_includedir}/qt4/Qt/QtGui"
+          - "%{_includedir}/qt4/Qt/QtHelp"
+          - "%{_includedir}/qt4/Qt/QtNetwork"
+          - "%{_includedir}/qt4/Qt/QtScript"
+          - "%{_includedir}/qt4/Qt/QtScriptTools"
+          - "%{_includedir}/qt4/Qt/QtSql"
+          - "%{_includedir}/qt4/Qt/QtSvg"
+          - "%{_includedir}/qt4/Qt/QtTest"
+          - "%{_includedir}/qt4/Qt/QtXml"
+          - "%{_includedir}/qt4/Qt/QtXmlPatterns"
+          - "%{_includedir}/qt4/Qt/qabstractanimation.h"
+          - "%{_includedir}/qt4/Qt/qabstractbutton.h"
+          - "%{_includedir}/qt4/Qt/qabstracteventdispatcher.h"
+          - "%{_includedir}/qt4/Qt/qabstractfileengine.h"
+          - "%{_includedir}/qt4/Qt/qabstractfontengine_qws.h"
+          - "%{_includedir}/qt4/Qt/qabstractitemdelegate.h"
+          - "%{_includedir}/qt4/Qt/qabstractitemmodel.h"
+          - "%{_includedir}/qt4/Qt/qabstractitemview.h"
+          - "%{_includedir}/qt4/Qt/qabstractmessagehandler.h"
+          - "%{_includedir}/qt4/Qt/qabstractnetworkcache.h"
+          - "%{_includedir}/qt4/Qt/qabstractpagesetupdialog.h"
+          - "%{_includedir}/qt4/Qt/qabstractprintdialog.h"
+          - "%{_includedir}/qt4/Qt/qabstractproxymodel.h"
+          - "%{_includedir}/qt4/Qt/qabstractscrollarea.h"
+          - "%{_includedir}/qt4/Qt/qabstractslider.h"
+          - "%{_includedir}/qt4/Qt/qabstractsocket.h"
+          - "%{_includedir}/qt4/Qt/qabstractspinbox.h"
+          - "%{_includedir}/qt4/Qt/qabstractstate.h"
+          - "%{_includedir}/qt4/Qt/qabstracttextdocumentlayout.h"
+          - "%{_includedir}/qt4/Qt/qabstracttransition.h"
+          - "%{_includedir}/qt4/Qt/qabstracturiresolver.h"
+          - "%{_includedir}/qt4/Qt/qabstractxmlnodemodel.h"
+          - "%{_includedir}/qt4/Qt/qabstractxmlreceiver.h"
+          - "%{_includedir}/qt4/Qt/qaccessible.h"
+          - "%{_includedir}/qt4/Qt/qaccessible2.h"
+          - "%{_includedir}/qt4/Qt/qaccessiblebridge.h"
+          - "%{_includedir}/qt4/Qt/qaccessibleobject.h"
+          - "%{_includedir}/qt4/Qt/qaccessibleplugin.h"
+          - "%{_includedir}/qt4/Qt/qaccessiblewidget.h"
+          - "%{_includedir}/qt4/Qt/qaction.h"
+          - "%{_includedir}/qt4/Qt/qactiongroup.h"
+          - "%{_includedir}/qt4/Qt/qalgorithms.h"
+          - "%{_includedir}/qt4/Qt/qanimationgroup.h"
+          - "%{_includedir}/qt4/Qt/qapplication.h"
+          - "%{_includedir}/qt4/Qt/qatomic.h"
+          - "%{_includedir}/qt4/Qt/qatomic_alpha.h"
+          - "%{_includedir}/qt4/Qt/qatomic_arch.h"
+          - "%{_includedir}/qt4/Qt/qatomic_arm.h"
+          - "%{_includedir}/qt4/Qt/qatomic_armv5.h"
+          - "%{_includedir}/qt4/Qt/qatomic_armv6.h"
+          - "%{_includedir}/qt4/Qt/qatomic_armv7.h"
+          - "%{_includedir}/qt4/Qt/qatomic_avr32.h"
+          - "%{_includedir}/qt4/Qt/qatomic_bfin.h"
+          - "%{_includedir}/qt4/Qt/qatomic_bootstrap.h"
+          - "%{_includedir}/qt4/Qt/qatomic_generic.h"
+          - "%{_includedir}/qt4/Qt/qatomic_i386.h"
+          - "%{_includedir}/qt4/Qt/qatomic_ia64.h"
+          - "%{_includedir}/qt4/Qt/qatomic_integrity.h"
+          - "%{_includedir}/qt4/Qt/qatomic_macosx.h"
+          - "%{_includedir}/qt4/Qt/qatomic_mips.h"
+          - "%{_includedir}/qt4/Qt/qatomic_parisc.h"
+          - "%{_includedir}/qt4/Qt/qatomic_powerpc.h"
+          - "%{_includedir}/qt4/Qt/qatomic_s390.h"
+          - "%{_includedir}/qt4/Qt/qatomic_sh.h"
+          - "%{_includedir}/qt4/Qt/qatomic_sh4a.h"
+          - "%{_includedir}/qt4/Qt/qatomic_sparc.h"
+          - "%{_includedir}/qt4/Qt/qatomic_symbian.h"
+          - "%{_includedir}/qt4/Qt/qatomic_vxworks.h"
+          - "%{_includedir}/qt4/Qt/qatomic_windows.h"
+          - "%{_includedir}/qt4/Qt/qatomic_windowsce.h"
+          - "%{_includedir}/qt4/Qt/qatomic_x86_64.h"
+          - "%{_includedir}/qt4/Qt/qauthenticator.h"
+          - "%{_includedir}/qt4/Qt/qbasicatomic.h"
+          - "%{_includedir}/qt4/Qt/qbasictimer.h"
+          - "%{_includedir}/qt4/Qt/qbenchmark.h"
+          - "%{_includedir}/qt4/Qt/qbenchmarkmetric.h"
+          - "%{_includedir}/qt4/Qt/qbitarray.h"
+          - "%{_includedir}/qt4/Qt/qbitmap.h"
+          - "%{_includedir}/qt4/Qt/qboxlayout.h"
+          - "%{_includedir}/qt4/Qt/qbrush.h"
+          - "%{_includedir}/qt4/Qt/qbuffer.h"
+          - "%{_includedir}/qt4/Qt/qbuttongroup.h"
+          - "%{_includedir}/qt4/Qt/qbytearray.h"
+          - "%{_includedir}/qt4/Qt/qbytearraymatcher.h"
+          - "%{_includedir}/qt4/Qt/qcache.h"
+          - "%{_includedir}/qt4/Qt/qcalendarwidget.h"
+          - "%{_includedir}/qt4/Qt/qcdestyle.h"
+          - "%{_includedir}/qt4/Qt/qchar.h"
+          - "%{_includedir}/qt4/Qt/qcheckbox.h"
+          - "%{_includedir}/qt4/Qt/qcleanlooksstyle.h"
+          - "%{_includedir}/qt4/Qt/qclipboard.h"
+          - "%{_includedir}/qt4/Qt/qcolor.h"
+          - "%{_includedir}/qt4/Qt/qcolordialog.h"
+          - "%{_includedir}/qt4/Qt/qcolormap.h"
+          - "%{_includedir}/qt4/Qt/qcolumnview.h"
+          - "%{_includedir}/qt4/Qt/qcombobox.h"
+          - "%{_includedir}/qt4/Qt/qcommandlinkbutton.h"
+          - "%{_includedir}/qt4/Qt/qcommonstyle.h"
+          - "%{_includedir}/qt4/Qt/qcompleter.h"
+          - "%{_includedir}/qt4/Qt/qconfig-dist.h"
+          - "%{_includedir}/qt4/Qt/qconfig-large.h"
+          - "%{_includedir}/qt4/Qt/qconfig-medium.h"
+          - "%{_includedir}/qt4/Qt/qconfig-minimal.h"
+          - "%{_includedir}/qt4/Qt/qconfig-nacl.h"
+          - "%{_includedir}/qt4/Qt/qconfig-small.h"
+          - "%{_includedir}/qt4/Qt/qconfig.h"
+          - "%{_includedir}/qt4/Qt/qcontainerfwd.h"
+          - "%{_includedir}/qt4/Qt/qcontiguouscache.h"
+          - "%{_includedir}/qt4/Qt/qcopchannel_qws.h"
+          - "%{_includedir}/qt4/Qt/qcoreapplication.h"
+          - "%{_includedir}/qt4/Qt/qcoreevent.h"
+          - "%{_includedir}/qt4/Qt/qcryptographichash.h"
+          - "%{_includedir}/qt4/Qt/qcursor.h"
+          - "%{_includedir}/qt4/Qt/qdatastream.h"
+          - "%{_includedir}/qt4/Qt/qdatawidgetmapper.h"
+          - "%{_includedir}/qt4/Qt/qdatetime.h"
+          - "%{_includedir}/qt4/Qt/qdatetimeedit.h"
+          - "%{_includedir}/qt4/Qt/qdbusabstractadaptor.h"
+          - "%{_includedir}/qt4/Qt/qdbusabstractinterface.h"
+          - "%{_includedir}/qt4/Qt/qdbusargument.h"
+          - "%{_includedir}/qt4/Qt/qdbusconnection.h"
+          - "%{_includedir}/qt4/Qt/qdbusconnectioninterface.h"
+          - "%{_includedir}/qt4/Qt/qdbuscontext.h"
+          - "%{_includedir}/qt4/Qt/qdbuserror.h"
+          - "%{_includedir}/qt4/Qt/qdbusextratypes.h"
+          - "%{_includedir}/qt4/Qt/qdbusinterface.h"
+          - "%{_includedir}/qt4/Qt/qdbusmacros.h"
+          - "%{_includedir}/qt4/Qt/qdbusmessage.h"
+          - "%{_includedir}/qt4/Qt/qdbusmetatype.h"
+          - "%{_includedir}/qt4/Qt/qdbuspendingcall.h"
+          - "%{_includedir}/qt4/Qt/qdbuspendingreply.h"
+          - "%{_includedir}/qt4/Qt/qdbusreply.h"
+          - "%{_includedir}/qt4/Qt/qdbusserver.h"
+          - "%{_includedir}/qt4/Qt/qdbusservicewatcher.h"
+          - "%{_includedir}/qt4/Qt/qdbusunixfiledescriptor.h"
+          - "%{_includedir}/qt4/Qt/qdbusvirtualobject.h"
+          - "%{_includedir}/qt4/Qt/qdebug.h"
+          - "%{_includedir}/qt4/Qt/qdeclarative.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativecomponent.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativecontext.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeengine.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeerror.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeexpression.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeextensioninterface.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeextensionplugin.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeimageprovider.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeinfo.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeitem.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativelist.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativenetworkaccessmanagerfactory.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeparserstatus.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeprivate.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeproperty.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativepropertymap.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativepropertyvalueinterceptor.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativepropertyvaluesource.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativescriptstring.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativeview.h"
+          - "%{_includedir}/qt4/Qt/qdeclarativedebug.h"
+          - "%{_includedir}/qt4/Qt/qdecoration_qws.h"
+          - "%{_includedir}/qt4/Qt/qdecorationdefault_qws.h"
+          - "%{_includedir}/qt4/Qt/qdecorationfactory_qws.h"
+          - "%{_includedir}/qt4/Qt/qdecorationplugin_qws.h"
+          - "%{_includedir}/qt4/Qt/qdecorationstyled_qws.h"
+          - "%{_includedir}/qt4/Qt/qdecorationwindows_qws.h"
+          - "%{_includedir}/qt4/Qt/qdesktopservices.h"
+          - "%{_includedir}/qt4/Qt/qdesktopwidget.h"
+          - "%{_includedir}/qt4/Qt/qdial.h"
+          - "%{_includedir}/qt4/Qt/qdialog.h"
+          - "%{_includedir}/qt4/Qt/qdialogbuttonbox.h"
+          - "%{_includedir}/qt4/Qt/qdir.h"
+          - "%{_includedir}/qt4/Qt/qdirectpainter_qws.h"
+          - "%{_includedir}/qt4/Qt/qdiriterator.h"
+          - "%{_includedir}/qt4/Qt/qdirmodel.h"
+          - "%{_includedir}/qt4/Qt/qdockwidget.h"
+          - "%{_includedir}/qt4/Qt/qdom.h"
+          - "%{_includedir}/qt4/Qt/qdrag.h"
+          - "%{_includedir}/qt4/Qt/qrawfont.h"
+          - "%{_includedir}/qt4/Qt/qdrawutil.h"
+          - "%{_includedir}/qt4/Qt/qeasingcurve.h"
+          - "%{_includedir}/qt4/Qt/qelapsedtimer.h"
+          - "%{_includedir}/qt4/Qt/qendian.h"
+          - "%{_includedir}/qt4/Qt/qerrormessage.h"
+          - "%{_includedir}/qt4/Qt/qevent.h"
+          - "%{_includedir}/qt4/Qt/qeventloop.h"
+          - "%{_includedir}/qt4/Qt/qeventtransition.h"
+          - "%{_includedir}/qt4/Qt/qfactoryinterface.h"
+          - "%{_includedir}/qt4/Qt/qfeatures.h"
+          - "%{_includedir}/qt4/Qt/qfile.h"
+          - "%{_includedir}/qt4/Qt/qfiledialog.h"
+          - "%{_includedir}/qt4/Qt/qfileiconprovider.h"
+          - "%{_includedir}/qt4/Qt/qfileinfo.h"
+          - "%{_includedir}/qt4/Qt/qfilesystemmodel.h"
+          - "%{_includedir}/qt4/Qt/qfilesystemwatcher.h"
+          - "%{_includedir}/qt4/Qt/qfinalstate.h"
+          - "%{_includedir}/qt4/Qt/qfocusframe.h"
+          - "%{_includedir}/qt4/Qt/qfont.h"
+          - "%{_includedir}/qt4/Qt/qfontcombobox.h"
+          - "%{_includedir}/qt4/Qt/qfontdatabase.h"
+          - "%{_includedir}/qt4/Qt/qfontdialog.h"
+          - "%{_includedir}/qt4/Qt/qfontinfo.h"
+          - "%{_includedir}/qt4/Qt/qfontmetrics.h"
+          - "%{_includedir}/qt4/Qt/qformlayout.h"
+          - "%{_includedir}/qt4/Qt/qframe.h"
+          - "%{_includedir}/qt4/Qt/qfsfileengine.h"
+          - "%{_includedir}/qt4/Qt/qftp.h"
+          - "%{_includedir}/qt4/Qt/qfunctions_nacl.h"
+          - "%{_includedir}/qt4/Qt/qfunctions_vxworks.h"
+          - "%{_includedir}/qt4/Qt/qfunctions_wince.h"
+          - "%{_includedir}/qt4/Qt/qfuture.h"
+          - "%{_includedir}/qt4/Qt/qfutureinterface.h"
+          - "%{_includedir}/qt4/Qt/qfuturesynchronizer.h"
+          - "%{_includedir}/qt4/Qt/qfuturewatcher.h"
+          - "%{_includedir}/qt4/Qt/qgenericmatrix.h"
+          - "%{_includedir}/qt4/Qt/qgenericplugin_qpa.h"
+          - "%{_includedir}/qt4/Qt/qgenericpluginfactory_qpa.h"
+          - "%{_includedir}/qt4/Qt/qgesture.h"
+          - "%{_includedir}/qt4/Qt/qgesturerecognizer.h"
+          - "%{_includedir}/qt4/Qt/qglobal.h"
+          - "%{_includedir}/qt4/Qt/qglyphrun.h"
+          - "%{_includedir}/qt4/Qt/qgraphicsanchorlayout.h"
+          - "%{_includedir}/qt4/Qt/qgraphicseffect.h"
+          - "%{_includedir}/qt4/Qt/qgraphicsgridlayout.h"
+          - "%{_includedir}/qt4/Qt/qgraphicsitem.h"
+          - "%{_includedir}/qt4/Qt/qgraphicsitemanimation.h"
+          - "%{_includedir}/qt4/Qt/qgraphicslayout.h"
+          - "%{_includedir}/qt4/Qt/qgraphicslayoutitem.h"
+          - "%{_includedir}/qt4/Qt/qgraphicslinearlayout.h"
+          - "%{_includedir}/qt4/Qt/qgraphicsproxywidget.h"
+          - "%{_includedir}/qt4/Qt/qgraphicsscene.h"
+          - "%{_includedir}/qt4/Qt/qgraphicssceneevent.h"
+          - "%{_includedir}/qt4/Qt/qgraphicssvgitem.h"
+          - "%{_includedir}/qt4/Qt/qgraphicstransform.h"
+          - "%{_includedir}/qt4/Qt/qgraphicsview.h"
+          - "%{_includedir}/qt4/Qt/qgraphicswidget.h"
+          - "%{_includedir}/qt4/Qt/qgridlayout.h"
+          - "%{_includedir}/qt4/Qt/qgroupbox.h"
+          - "%{_includedir}/qt4/Qt/qgtkstyle.h"
+          - "%{_includedir}/qt4/Qt/qguifunctions_wince.h"
+          - "%{_includedir}/qt4/Qt/qhash.h"
+          - "%{_includedir}/qt4/Qt/qheaderview.h"
+          - "%{_includedir}/qt4/Qt/qhelp_global.h"
+          - "%{_includedir}/qt4/Qt/qhelpcontentwidget.h"
+          - "%{_includedir}/qt4/Qt/qhelpengine.h"
+          - "%{_includedir}/qt4/Qt/qhelpenginecore.h"
+          - "%{_includedir}/qt4/Qt/qhelpindexwidget.h"
+          - "%{_includedir}/qt4/Qt/qhelpsearchengine.h"
+          - "%{_includedir}/qt4/Qt/qhelpsearchquerywidget.h"
+          - "%{_includedir}/qt4/Qt/qhelpsearchresultwidget.h"
+          - "%{_includedir}/qt4/Qt/qhistorystate.h"
+          - "%{_includedir}/qt4/Qt/qhostaddress.h"
+          - "%{_includedir}/qt4/Qt/qhostinfo.h"
+          - "%{_includedir}/qt4/Qt/qhttp.h"
+          - "%{_includedir}/qt4/Qt/qhttpmultipart.h"
+          - "%{_includedir}/qt4/Qt/qicon.h"
+          - "%{_includedir}/qt4/Qt/qiconengine.h"
+          - "%{_includedir}/qt4/Qt/qiconengineplugin.h"
+          - "%{_includedir}/qt4/Qt/qidentityproxymodel.h"
+          - "%{_includedir}/qt4/Qt/qimage.h"
+          - "%{_includedir}/qt4/Qt/qimageiohandler.h"
+          - "%{_includedir}/qt4/Qt/qimagereader.h"
+          - "%{_includedir}/qt4/Qt/qimagewriter.h"
+          - "%{_includedir}/qt4/Qt/qinputcontext.h"
+          - "%{_includedir}/qt4/Qt/qinputcontextfactory.h"
+          - "%{_includedir}/qt4/Qt/qinputcontextplugin.h"
+          - "%{_includedir}/qt4/Qt/qinputdialog.h"
+          - "%{_includedir}/qt4/Qt/qiodevice.h"
+          - "%{_includedir}/qt4/Qt/qitemdelegate.h"
+          - "%{_includedir}/qt4/Qt/qitemeditorfactory.h"
+          - "%{_includedir}/qt4/Qt/qitemselectionmodel.h"
+          - "%{_includedir}/qt4/Qt/qiterator.h"
+          - "%{_includedir}/qt4/Qt/qkbd_qws.h"
+          - "%{_includedir}/qt4/Qt/qkbddriverfactory_qws.h"
+          - "%{_includedir}/qt4/Qt/qkbddriverplugin_qws.h"
+          - "%{_includedir}/qt4/Qt/qkbdintegrity_qws.h"
+          - "%{_includedir}/qt4/Qt/qkbdlinuxinput_qws.h"
+          - "%{_includedir}/qt4/Qt/qkbdqnx_qws.h"
+          - "%{_includedir}/qt4/Qt/qkbdtty_qws.h"
+          - "%{_includedir}/qt4/Qt/qkbdum_qws.h"
+          - "%{_includedir}/qt4/Qt/qkbdvfb_qws.h"
+          - "%{_includedir}/qt4/Qt/qkeyeventtransition.h"
+          - "%{_includedir}/qt4/Qt/qkeysequence.h"
+          - "%{_includedir}/qt4/Qt/qlabel.h"
+          - "%{_includedir}/qt4/Qt/qlayout.h"
+          - "%{_includedir}/qt4/Qt/qlayoutitem.h"
+          - "%{_includedir}/qt4/Qt/qlcdnumber.h"
+          - "%{_includedir}/qt4/Qt/qlibrary.h"
+          - "%{_includedir}/qt4/Qt/qlibraryinfo.h"
+          - "%{_includedir}/qt4/Qt/qline.h"
+          - "%{_includedir}/qt4/Qt/qlineedit.h"
+          - "%{_includedir}/qt4/Qt/qlinkedlist.h"
+          - "%{_includedir}/qt4/Qt/qlist.h"
+          - "%{_includedir}/qt4/Qt/qlistview.h"
+          - "%{_includedir}/qt4/Qt/qlistwidget.h"
+          - "%{_includedir}/qt4/Qt/qlocale.h"
+          - "%{_includedir}/qt4/Qt/qlocalserver.h"
+          - "%{_includedir}/qt4/Qt/qlocalsocket.h"
+          - "%{_includedir}/qt4/Qt/qmaccocoaviewcontainer_mac.h"
+          - "%{_includedir}/qt4/Qt/qmacdefines_mac.h"
+          - "%{_includedir}/qt4/Qt/qmacnativewidget_mac.h"
+          - "%{_includedir}/qt4/Qt/qmacstyle_mac.h"
+          - "%{_includedir}/qt4/Qt/qmainwindow.h"
+          - "%{_includedir}/qt4/Qt/qmap.h"
+          - "%{_includedir}/qt4/Qt/qmargins.h"
+          - "%{_includedir}/qt4/Qt/qmath.h"
+          - "%{_includedir}/qt4/Qt/qmatrix.h"
+          - "%{_includedir}/qt4/Qt/qmatrix4x4.h"
+          - "%{_includedir}/qt4/Qt/qmdiarea.h"
+          - "%{_includedir}/qt4/Qt/qmdisubwindow.h"
+          - "%{_includedir}/qt4/Qt/qmenu.h"
+          - "%{_includedir}/qt4/Qt/qmenubar.h"
+          - "%{_includedir}/qt4/Qt/qmenudata.h"
+          - "%{_includedir}/qt4/Qt/qmessagebox.h"
+          - "%{_includedir}/qt4/Qt/qmetaobject.h"
+          - "%{_includedir}/qt4/Qt/qmetatype.h"
+          - "%{_includedir}/qt4/Qt/qmime.h"
+          - "%{_includedir}/qt4/Qt/qmimedata.h"
+          - "%{_includedir}/qt4/Qt/qmotifstyle.h"
+          - "%{_includedir}/qt4/Qt/qmouse_qws.h"
+          - "%{_includedir}/qt4/Qt/qmousedriverfactory_qws.h"
+          - "%{_includedir}/qt4/Qt/qmousedriverplugin_qws.h"
+          - "%{_includedir}/qt4/Qt/qmouseeventtransition.h"
+          - "%{_includedir}/qt4/Qt/qmouseintegrity_qws.h"
+          - "%{_includedir}/qt4/Qt/qmouselinuxinput_qws.h"
+          - "%{_includedir}/qt4/Qt/qmouselinuxtp_qws.h"
+          - "%{_includedir}/qt4/Qt/qmousepc_qws.h"
+          - "%{_includedir}/qt4/Qt/qmouseqnx_qws.h"
+          - "%{_includedir}/qt4/Qt/qmousetslib_qws.h"
+          - "%{_includedir}/qt4/Qt/qmousevfb_qws.h"
+          - "%{_includedir}/qt4/Qt/qmovie.h"
+          - "%{_includedir}/qt4/Qt/qmutex.h"
+          - "%{_includedir}/qt4/Qt/qnamespace.h"
+          - "%{_includedir}/qt4/Qt/qnetworkaccessmanager.h"
+          - "%{_includedir}/qt4/Qt/qnetworkconfigmanager.h"
+          - "%{_includedir}/qt4/Qt/qnetworkconfiguration.h"
+          - "%{_includedir}/qt4/Qt/qnetworkcookie.h"
+          - "%{_includedir}/qt4/Qt/qnetworkcookiejar.h"
+          - "%{_includedir}/qt4/Qt/qnetworkdiskcache.h"
+          - "%{_includedir}/qt4/Qt/qnetworkinterface.h"
+          - "%{_includedir}/qt4/Qt/qnetworkfunctions_wince.h"
+          - "%{_includedir}/qt4/Qt/qnetworkproxy.h"
+          - "%{_includedir}/qt4/Qt/qnetworkreply.h"
+          - "%{_includedir}/qt4/Qt/qnetworkrequest.h"
+          - "%{_includedir}/qt4/Qt/qnetworksession.h"
+          - "%{_includedir}/qt4/Qt/qnumeric.h"
+          - "%{_includedir}/qt4/Qt/qobject.h"
+          - "%{_includedir}/qt4/Qt/qobjectcleanuphandler.h"
+          - "%{_includedir}/qt4/Qt/qobjectdefs.h"
+          - "%{_includedir}/qt4/Qt/qpagesetupdialog.h"
+          - "%{_includedir}/qt4/Qt/qpaintdevice.h"
+          - "%{_includedir}/qt4/Qt/qpaintengine.h"
+          - "%{_includedir}/qt4/Qt/qpainter.h"
+          - "%{_includedir}/qt4/Qt/qpainterpath.h"
+          - "%{_includedir}/qt4/Qt/qpair.h"
+          - "%{_includedir}/qt4/Qt/qpalette.h"
+          - "%{_includedir}/qt4/Qt/qparallelanimationgroup.h"
+          - "%{_includedir}/qt4/Qt/qpauseanimation.h"
+          - "%{_includedir}/qt4/Qt/qpen.h"
+          - "%{_includedir}/qt4/Qt/qpicture.h"
+          - "%{_includedir}/qt4/Qt/qpictureformatplugin.h"
+          - "%{_includedir}/qt4/Qt/qpixmap.h"
+          - "%{_includedir}/qt4/Qt/qpixmapcache.h"
+          - "%{_includedir}/qt4/Qt/qplaintextedit.h"
+          - "%{_includedir}/qt4/Qt/qplastiquestyle.h"
+          - "%{_includedir}/qt4/Qt/qplatformclipboard_qpa.h"
+          - "%{_includedir}/qt4/Qt/qplatformcursor_qpa.h"
+          - "%{_includedir}/qt4/Qt/qplatformeventloopintegration_qpa.h"
+          - "%{_includedir}/qt4/Qt/qplatformfontdatabase_qpa.h"
+          - "%{_includedir}/qt4/Qt/qplatformglcontext_qpa.h"
+          - "%{_includedir}/qt4/Qt/qplatformintegration_qpa.h"
+          - "%{_includedir}/qt4/Qt/qplatformintegrationplugin_qpa.h"
+          - "%{_includedir}/qt4/Qt/qplatformnativeinterface_qpa.h"
+          - "%{_includedir}/qt4/Qt/qplatformscreen_qpa.h"
+          - "%{_includedir}/qt4/Qt/qplatformwindow_qpa.h"
+          - "%{_includedir}/qt4/Qt/qplatformwindowformat_qpa.h"
+          - "%{_includedir}/qt4/Qt/qplugin.h"
+          - "%{_includedir}/qt4/Qt/qpluginloader.h"
+          - "%{_includedir}/qt4/Qt/qpoint.h"
+          - "%{_includedir}/qt4/Qt/qpointer.h"
+          - "%{_includedir}/qt4/Qt/qpolygon.h"
+          - "%{_includedir}/qt4/Qt/qprintdialog.h"
+          - "%{_includedir}/qt4/Qt/qprintengine.h"
+          - "%{_includedir}/qt4/Qt/qprinter.h"
+          - "%{_includedir}/qt4/Qt/qprinterinfo.h"
+          - "%{_includedir}/qt4/Qt/qprintpreviewdialog.h"
+          - "%{_includedir}/qt4/Qt/qprintpreviewwidget.h"
+          - "%{_includedir}/qt4/Qt/qprocess.h"
+          - "%{_includedir}/qt4/Qt/qprogressbar.h"
+          - "%{_includedir}/qt4/Qt/qprogressdialog.h"
+          - "%{_includedir}/qt4/Qt/qpropertyanimation.h"
+          - "%{_includedir}/qt4/Qt/qproxymodel.h"
+          - "%{_includedir}/qt4/Qt/qproxystyle.h"
+          - "%{_includedir}/qt4/Qt/qpushbutton.h"
+          - "%{_includedir}/qt4/Qt/qquaternion.h"
+          - "%{_includedir}/qt4/Qt/qqueue.h"
+          - "%{_includedir}/qt4/Qt/qradiobutton.h"
+          - "%{_includedir}/qt4/Qt/qreadwritelock.h"
+          - "%{_includedir}/qt4/Qt/qrect.h"
+          - "%{_includedir}/qt4/Qt/qregexp.h"
+          - "%{_includedir}/qt4/Qt/qregion.h"
+          - "%{_includedir}/qt4/Qt/qresource.h"
+          - "%{_includedir}/qt4/Qt/qrgb.h"
+          - "%{_includedir}/qt4/Qt/qrubberband.h"
+          - "%{_includedir}/qt4/Qt/qrunnable.h"
+          - "%{_includedir}/qt4/Qt/qs60mainapplication.h"
+          - "%{_includedir}/qt4/Qt/qs60mainappui.h"
+          - "%{_includedir}/qt4/Qt/qs60maindocument.h"
+          - "%{_includedir}/qt4/Qt/qs60style.h"
+          - "%{_includedir}/qt4/Qt/qscopedpointer.h"
+          - "%{_includedir}/qt4/Qt/qscopedvaluerollback.h"
+          - "%{_includedir}/qt4/Qt/qscreen_qws.h"
+          - "%{_includedir}/qt4/Qt/qscreendriverfactory_qws.h"
+          - "%{_includedir}/qt4/Qt/qscreendriverplugin_qws.h"
+          - "%{_includedir}/qt4/Qt/qscreenintegrityfb_qws.h"
+          - "%{_includedir}/qt4/Qt/qscreenlinuxfb_qws.h"
+          - "%{_includedir}/qt4/Qt/qscreenproxy_qws.h"
+          - "%{_includedir}/qt4/Qt/qscreenqnx_qws.h"
+          - "%{_includedir}/qt4/Qt/qscreentransformed_qws.h"
+          - "%{_includedir}/qt4/Qt/qscreenvfb_qws.h"
+          - "%{_includedir}/qt4/Qt/qscriptable.h"
+          - "%{_includedir}/qt4/Qt/qscriptclass.h"
+          - "%{_includedir}/qt4/Qt/qscriptclasspropertyiterator.h"
+          - "%{_includedir}/qt4/Qt/qscriptcontext.h"
+          - "%{_includedir}/qt4/Qt/qscriptcontextinfo.h"
+          - "%{_includedir}/qt4/Qt/qscriptengine.h"
+          - "%{_includedir}/qt4/Qt/qscriptengineagent.h"
+          - "%{_includedir}/qt4/Qt/qscriptenginedebugger.h"
+          - "%{_includedir}/qt4/Qt/qscriptextensioninterface.h"
+          - "%{_includedir}/qt4/Qt/qscriptextensionplugin.h"
+          - "%{_includedir}/qt4/Qt/qscriptprogram.h"
+          - "%{_includedir}/qt4/Qt/qscriptstring.h"
+          - "%{_includedir}/qt4/Qt/qscriptvalue.h"
+          - "%{_includedir}/qt4/Qt/qscriptvalueiterator.h"
+          - "%{_includedir}/qt4/Qt/qscrollarea.h"
+          - "%{_includedir}/qt4/Qt/qscrollbar.h"
+          - "%{_includedir}/qt4/Qt/qsemaphore.h"
+          - "%{_includedir}/qt4/Qt/qsequentialanimationgroup.h"
+          - "%{_includedir}/qt4/Qt/qsessionmanager.h"
+          - "%{_includedir}/qt4/Qt/qset.h"
+          - "%{_includedir}/qt4/Qt/qsettings.h"
+          - "%{_includedir}/qt4/Qt/qshareddata.h"
+          - "%{_includedir}/qt4/Qt/qsharedmemory.h"
+          - "%{_includedir}/qt4/Qt/qsharedpointer.h"
+          - "%{_includedir}/qt4/Qt/qsharedpointer_impl.h"
+          - "%{_includedir}/qt4/Qt/qshortcut.h"
+          - "%{_includedir}/qt4/Qt/qsignalmapper.h"
+          - "%{_includedir}/qt4/Qt/qsignalspy.h"
+          - "%{_includedir}/qt4/Qt/qsignaltransition.h"
+          - "%{_includedir}/qt4/Qt/qsimplexmlnodemodel.h"
+          - "%{_includedir}/qt4/Qt/qsize.h"
+          - "%{_includedir}/qt4/Qt/qsizegrip.h"
+          - "%{_includedir}/qt4/Qt/qsizepolicy.h"
+          - "%{_includedir}/qt4/Qt/qslider.h"
+          - "%{_includedir}/qt4/Qt/qsocketnotifier.h"
+          - "%{_includedir}/qt4/Qt/qsortfilterproxymodel.h"
+          - "%{_includedir}/qt4/Qt/qsound.h"
+          - "%{_includedir}/qt4/Qt/qsoundqss_qws.h"
+          - "%{_includedir}/qt4/Qt/qsourcelocation.h"
+          - "%{_includedir}/qt4/Qt/qspinbox.h"
+          - "%{_includedir}/qt4/Qt/qsplashscreen.h"
+          - "%{_includedir}/qt4/Qt/qsplitter.h"
+          - "%{_includedir}/qt4/Qt/qsql.h"
+          - "%{_includedir}/qt4/Qt/qsql_db2.h"
+          - "%{_includedir}/qt4/Qt/qsql_ibase.h"
+          - "%{_includedir}/qt4/Qt/qsql_mysql.h"
+          - "%{_includedir}/qt4/Qt/qsql_oci.h"
+          - "%{_includedir}/qt4/Qt/qsql_odbc.h"
+          - "%{_includedir}/qt4/Qt/qsql_psql.h"
+          - "%{_includedir}/qt4/Qt/qsql_sqlite.h"
+          - "%{_includedir}/qt4/Qt/qsql_symsql.h"
+          - "%{_includedir}/qt4/Qt/qsql_sqlite2.h"
+          - "%{_includedir}/qt4/Qt/qsql_tds.h"
+          - "%{_includedir}/qt4/Qt/qsqldatabase.h"
+          - "%{_includedir}/qt4/Qt/qsqldriver.h"
+          - "%{_includedir}/qt4/Qt/qsqldriverplugin.h"
+          - "%{_includedir}/qt4/Qt/qsqlerror.h"
+          - "%{_includedir}/qt4/Qt/qsqlfield.h"
+          - "%{_includedir}/qt4/Qt/qsqlindex.h"
+          - "%{_includedir}/qt4/Qt/qsqlquery.h"
+          - "%{_includedir}/qt4/Qt/qsqlquerymodel.h"
+          - "%{_includedir}/qt4/Qt/qsqlrecord.h"
+          - "%{_includedir}/qt4/Qt/qsqlrelationaldelegate.h"
+          - "%{_includedir}/qt4/Qt/qsqlrelationaltablemodel.h"
+          - "%{_includedir}/qt4/Qt/qsqlresult.h"
+          - "%{_includedir}/qt4/Qt/qsqltablemodel.h"
+          - "%{_includedir}/qt4/Qt/qssl.h"
+          - "%{_includedir}/qt4/Qt/qsslcertificate.h"
+          - "%{_includedir}/qt4/Qt/qsslcipher.h"
+          - "%{_includedir}/qt4/Qt/qsslconfiguration.h"
+          - "%{_includedir}/qt4/Qt/qsslerror.h"
+          - "%{_includedir}/qt4/Qt/qsslkey.h"
+          - "%{_includedir}/qt4/Qt/qsslsocket.h"
+          - "%{_includedir}/qt4/Qt/qstack.h"
+          - "%{_includedir}/qt4/Qt/qstackedlayout.h"
+          - "%{_includedir}/qt4/Qt/qstackedwidget.h"
+          - "%{_includedir}/qt4/Qt/qstandarditemmodel.h"
+          - "%{_includedir}/qt4/Qt/qstate.h"
+          - "%{_includedir}/qt4/Qt/qstatemachine.h"
+          - "%{_includedir}/qt4/Qt/qstatictext.h"
+          - "%{_includedir}/qt4/Qt/qstatusbar.h"
+          - "%{_includedir}/qt4/Qt/qstring.h"
+          - "%{_includedir}/qt4/Qt/qstringbuilder.h"
+          - "%{_includedir}/qt4/Qt/qstringlist.h"
+          - "%{_includedir}/qt4/Qt/qstringlistmodel.h"
+          - "%{_includedir}/qt4/Qt/qstringmatcher.h"
+          - "%{_includedir}/qt4/Qt/qstyle.h"
+          - "%{_includedir}/qt4/Qt/qstyleditemdelegate.h"
+          - "%{_includedir}/qt4/Qt/qstylefactory.h"
+          - "%{_includedir}/qt4/Qt/qstyleoption.h"
+          - "%{_includedir}/qt4/Qt/qstylepainter.h"
+          - "%{_includedir}/qt4/Qt/qstyleplugin.h"
+          - "%{_includedir}/qt4/Qt/qsvggenerator.h"
+          - "%{_includedir}/qt4/Qt/qsvgrenderer.h"
+          - "%{_includedir}/qt4/Qt/qsvgwidget.h"
+          - "%{_includedir}/qt4/Qt/qsymbianevent.h"
+          - "%{_includedir}/qt4/Qt/qsyntaxhighlighter.h"
+          - "%{_includedir}/qt4/Qt/qsystemsemaphore.h"
+          - "%{_includedir}/qt4/Qt/qsystemtrayicon.h"
+          - "%{_includedir}/qt4/Qt/qt_windows.h"
+          - "%{_includedir}/qt4/Qt/qtabbar.h"
+          - "%{_includedir}/qt4/Qt/qtableview.h"
+          - "%{_includedir}/qt4/Qt/qtablewidget.h"
+          - "%{_includedir}/qt4/Qt/qtabwidget.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentcompilertest.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentexception.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentfilter.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentfilterkernel.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentfunctionwrappers.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentiteratekernel.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentmap.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentmapkernel.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentmedian.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentreducekernel.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentresultstore.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentrun.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentrunbase.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentstoredfunctioncall.h"
+          - "%{_includedir}/qt4/Qt/qtconcurrentthreadengine.h"
+          - "%{_includedir}/qt4/Qt/qtcpserver.h"
+          - "%{_includedir}/qt4/Qt/qtcpsocket.h"
+          - "%{_includedir}/qt4/Qt/qtemporaryfile.h"
+          - "%{_includedir}/qt4/Qt/qtest.h"
+          - "%{_includedir}/qt4/Qt/qtest_global.h"
+          - "%{_includedir}/qt4/Qt/qtest_gui.h"
+          - "%{_includedir}/qt4/Qt/qtestaccessible.h"
+          - "%{_includedir}/qt4/Qt/qtestassert.h"
+          - "%{_includedir}/qt4/Qt/qtestbasicstreamer.h"
+          - "%{_includedir}/qt4/Qt/qtestcase.h"
+          - "%{_includedir}/qt4/Qt/qtestcoreelement.h"
+          - "%{_includedir}/qt4/Qt/qtestcorelist.h"
+          - "%{_includedir}/qt4/Qt/qtestdata.h"
+          - "%{_includedir}/qt4/Qt/qtestelement.h"
+          - "%{_includedir}/qt4/Qt/qtestelementattribute.h"
+          - "%{_includedir}/qt4/Qt/qtestevent.h"
+          - "%{_includedir}/qt4/Qt/qtesteventloop.h"
+          - "%{_includedir}/qt4/Qt/qtestfilelogger.h"
+          - "%{_includedir}/qt4/Qt/qtestkeyboard.h"
+          - "%{_includedir}/qt4/Qt/qtestlightxmlstreamer.h"
+          - "%{_includedir}/qt4/Qt/qtestmouse.h"
+          - "%{_includedir}/qt4/Qt/qtestspontaneevent.h"
+          - "%{_includedir}/qt4/Qt/qtestsystem.h"
+          - "%{_includedir}/qt4/Qt/qtesttouch.h"
+          - "%{_includedir}/qt4/Qt/qtestxmlstreamer.h"
+          - "%{_includedir}/qt4/Qt/qtestxunitstreamer.h"
+          - "%{_includedir}/qt4/Qt/qtextboundaryfinder.h"
+          - "%{_includedir}/qt4/Qt/qtextbrowser.h"
+          - "%{_includedir}/qt4/Qt/qtextcodec.h"
+          - "%{_includedir}/qt4/Qt/qtextcodecplugin.h"
+          - "%{_includedir}/qt4/Qt/qtextcursor.h"
+          - "%{_includedir}/qt4/Qt/qtextdocument.h"
+          - "%{_includedir}/qt4/Qt/qtextdocumentfragment.h"
+          - "%{_includedir}/qt4/Qt/qtextdocumentwriter.h"
+          - "%{_includedir}/qt4/Qt/qtextedit.h"
+          - "%{_includedir}/qt4/Qt/qtextformat.h"
+          - "%{_includedir}/qt4/Qt/qtextlayout.h"
+          - "%{_includedir}/qt4/Qt/qtextlist.h"
+          - "%{_includedir}/qt4/Qt/qtextobject.h"
+          - "%{_includedir}/qt4/Qt/qtextoption.h"
+          - "%{_includedir}/qt4/Qt/qtextstream.h"
+          - "%{_includedir}/qt4/Qt/qtexttable.h"
+          - "%{_includedir}/qt4/Qt/qthread.h"
+          - "%{_includedir}/qt4/Qt/qthreadpool.h"
+          - "%{_includedir}/qt4/Qt/qthreadstorage.h"
+          - "%{_includedir}/qt4/Qt/qtimeline.h"
+          - "%{_includedir}/qt4/Qt/qtimer.h"
+          - "%{_includedir}/qt4/Qt/qtoolbar.h"
+          - "%{_includedir}/qt4/Qt/qtoolbox.h"
+          - "%{_includedir}/qt4/Qt/qtoolbutton.h"
+          - "%{_includedir}/qt4/Qt/qtooltip.h"
+          - "%{_includedir}/qt4/Qt/qtransform.h"
+          - "%{_includedir}/qt4/Qt/qtranslator.h"
+          - "%{_includedir}/qt4/Qt/qtransportauth_qws.h"
+          - "%{_includedir}/qt4/Qt/qtransportauthdefs_qws.h"
+          - "%{_includedir}/qt4/Qt/qtreeview.h"
+          - "%{_includedir}/qt4/Qt/qtreewidget.h"
+          - "%{_includedir}/qt4/Qt/qtreewidgetitemiterator.h"
+          - "%{_includedir}/qt4/Qt/qudpsocket.h"
+          - "%{_includedir}/qt4/Qt/qundogroup.h"
+          - "%{_includedir}/qt4/Qt/qundostack.h"
+          - "%{_includedir}/qt4/Qt/qundoview.h"
+          - "%{_includedir}/qt4/Qt/qurl.h"
+          - "%{_includedir}/qt4/Qt/qurlinfo.h"
+          - "%{_includedir}/qt4/Qt/quuid.h"
+          - "%{_includedir}/qt4/Qt/qvalidator.h"
+          - "%{_includedir}/qt4/Qt/qvariant.h"
+          - "%{_includedir}/qt4/Qt/qvariantanimation.h"
+          - "%{_includedir}/qt4/Qt/qvarlengtharray.h"
+          - "%{_includedir}/qt4/Qt/qvector.h"
+          - "%{_includedir}/qt4/Qt/qvector2d.h"
+          - "%{_includedir}/qt4/Qt/qvector3d.h"
+          - "%{_includedir}/qt4/Qt/qvector4d.h"
+          - "%{_includedir}/qt4/Qt/qvfbhdr.h"
+          - "%{_includedir}/qt4/Qt/qwaitcondition.h"
+          - "%{_includedir}/qt4/Qt/qwhatsthis.h"
+          - "%{_includedir}/qt4/Qt/qwidget.h"
+          - "%{_includedir}/qt4/Qt/qwidgetaction.h"
+          - "%{_includedir}/qt4/Qt/qwindowdefs.h"
+          - "%{_includedir}/qt4/Qt/qwindowdefs_win.h"
+          - "%{_includedir}/qt4/Qt/qwindowscestyle.h"
+          - "%{_includedir}/qt4/Qt/qwindowsmobilestyle.h"
+          - "%{_includedir}/qt4/Qt/qwindowsstyle.h"
+          - "%{_includedir}/qt4/Qt/qwindowsvistastyle.h"
+          - "%{_includedir}/qt4/Qt/qwindowsxpstyle.h"
+          - "%{_includedir}/qt4/Qt/qwindowsystem_qws.h"
+          - "%{_includedir}/qt4/Qt/qwindowsysteminterface_qpa.h"
+          - "%{_includedir}/qt4/Qt/qwizard.h"
+          - "%{_includedir}/qt4/Qt/qwmatrix.h"
+          - "%{_includedir}/qt4/Qt/qworkspace.h"
+          - "%{_includedir}/qt4/Qt/qwscursor_qws.h"
+          - "%{_includedir}/qt4/Qt/qwsdisplay_qws.h"
+          - "%{_includedir}/qt4/Qt/qwsembedwidget.h"
+          - "%{_includedir}/qt4/Qt/qwsevent_qws.h"
+          - "%{_includedir}/qt4/Qt/qwsmanager_qws.h"
+          - "%{_includedir}/qt4/Qt/qwsproperty_qws.h"
+          - "%{_includedir}/qt4/Qt/qwsprotocolitem_qws.h"
+          - "%{_includedir}/qt4/Qt/qwssocket_qws.h"
+          - "%{_includedir}/qt4/Qt/qwsutils_qws.h"
+          - "%{_includedir}/qt4/Qt/qx11embed_x11.h"
+          - "%{_includedir}/qt4/Qt/qx11info_x11.h"
+          - "%{_includedir}/qt4/Qt/qxml.h"
+          - "%{_includedir}/qt4/Qt/qxmlformatter.h"
+          - "%{_includedir}/qt4/Qt/qxmlname.h"
+          - "%{_includedir}/qt4/Qt/qxmlnamepool.h"
+          - "%{_includedir}/qt4/Qt/qxmlquery.h"
+          - "%{_includedir}/qt4/Qt/qxmlresultitems.h"
+          - "%{_includedir}/qt4/Qt/qxmlschema.h"
+          - "%{_includedir}/qt4/Qt/qxmlschemavalidator.h"
+          - "%{_includedir}/qt4/Qt/qxmlserializer.h"
+          - "%{_includedir}/qt4/Qt/qxmlstream.h"
+          - "%{_includedir}/qt4/QtCore/"
+          - "%{_includedir}/qt4/QtDBus/"
+          - "%{_includedir}/qt4/QtDeclarative/"
+          - "%{_includedir}/qt4/QtDesigner/"
+          - "%{_includedir}/qt4/QtGui/"
+          - "%{_includedir}/qt4/QtHelp/"
+          - "%{_includedir}/qt4/QtNetwork/"
+          - "%{_includedir}/qt4/QtScript/"
+          - "%{_includedir}/qt4/QtScriptTools/"
+          - "%{_includedir}/qt4/QtSql/"
+          - "%{_includedir}/qt4/QtSvg/"
+          - "%{_includedir}/qt4/QtTest/"
+          - "%{_includedir}/qt4/QtUiTools/"
+          - "%{_includedir}/qt4/QtXml/"
+          - "%{_includedir}/qt4/QtXmlPatterns/"
+          - "%{_libdir}/libQtCLucene.prl"
+          - "%{_libdir}/libQtCLucene.so"
+          - "%{_libdir}/libQtCore.prl"
+          - "%{_libdir}/libQtCore.so"
+          - "%{_libdir}/libQtDBus.prl"
+          - "%{_libdir}/libQtDBus.so"
+          - "%{_libdir}/libQtDeclarative.prl"
+          - "%{_libdir}/libQtDeclarative.so"
+          - "%{_libdir}/libQtDesigner.prl"
+          - "%{_libdir}/libQtDesigner.so"
+          - "%{_libdir}/libQtDesignerComponents.prl"
+          - "%{_libdir}/libQtDesignerComponents.so"
+          - "%{_libdir}/libQtGui.prl"
+          - "%{_libdir}/libQtGui.so"
+          - "%{_libdir}/libQtHelp.prl"
+          - "%{_libdir}/libQtHelp.so"
+          - "%{_libdir}/libQtNetwork.prl"
+          - "%{_libdir}/libQtNetwork.so"
+          - "%{_libdir}/libQtScript.prl"
+          - "%{_libdir}/libQtScript.so"
+          - "%{_libdir}/libQtScriptTools.prl"
+          - "%{_libdir}/libQtScriptTools.so"
+          - "%{_libdir}/libQtSql.prl"
+          - "%{_libdir}/libQtSql.so"
+          - "%{_libdir}/libQtSvg.prl"
+          - "%{_libdir}/libQtSvg.so"
+          - "%{_libdir}/libQtTest.prl"
+          - "%{_libdir}/libQtTest.so"
+          - "%{_libdir}/libQtUiTools.a"
+          - "%{_libdir}/libQtUiTools.prl"
+          - "%{_libdir}/libQtXml.prl"
+          - "%{_libdir}/libQtXml.so"
+          - "%{_libdir}/libQtXmlPatterns.prl"
+          - "%{_libdir}/libQtXmlPatterns.so"
+          - "%{_libdir}/pkgconfig/QtCLucene.pc"
+          - "%{_libdir}/pkgconfig/QtCore.pc"
+          - "%{_libdir}/pkgconfig/QtDBus.pc"
+          - "%{_libdir}/pkgconfig/QtDeclarative.pc"
+          - "%{_libdir}/pkgconfig/QtDesigner.pc"
+          - "%{_libdir}/pkgconfig/QtDesignerComponents.pc"
+          - "%{_libdir}/pkgconfig/QtGui.pc"
+          - "%{_libdir}/pkgconfig/QtHelp.pc"
+          - "%{_libdir}/pkgconfig/QtNetwork.pc"
+          - "%{_libdir}/pkgconfig/QtScript.pc"
+          - "%{_libdir}/pkgconfig/QtScriptTools.pc"
+          - "%{_libdir}/pkgconfig/QtSql.pc"
+          - "%{_libdir}/pkgconfig/QtSvg.pc"
+          - "%{_libdir}/pkgconfig/QtTest.pc"
+          - "%{_libdir}/pkgconfig/QtUiTools.pc"
+          - "%{_libdir}/pkgconfig/QtXml.pc"
+          - "%{_libdir}/pkgconfig/QtXmlPatterns.pc"
+          - "%{_datadir}/qt4/q3porting.xml"
+
+    - Name: libqtnetwork4
+      AsWholeName: yes
+      Summary: Qt network module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtNetwork module offers classes that allow you to write TCP/IP clients and
+          servers. It provides classes to make network programming easier and portable.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtNetwork.so.*"
+          - "%{_libdir}/qt4/plugins/bearer/libqconnmanbearer.so"
+          - "%{_libdir}/qt4/plugins/bearer/libqnmbearer.so"
+
+    - Name: libqtdeclarative4-particles
+      AsWholeName: yes
+      Summary: Qt particles QML plugin
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains the particles QML plugin for QtDeclarative.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/qt4/imports/Qt/labs/particles/libqmlparticlesplugin.so"
+          - "%{_libdir}/qt4/imports/Qt/labs/particles/qmldir"
+
+    - Name: libqtdeclarative4-shaders
+      AsWholeName: yes
+      Summary: Qt sharders QML plugin
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains the shaders QML plugin for QtDeclarative.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/qt4/imports/Qt/labs/shaders/libqmlshadersplugin.so"
+          - "%{_libdir}/qt4/imports/Qt/labs/shaders/qmldir"
+
+    - Name: libqtsql4
+      AsWholeName: yes
+      Summary: Qt SQL module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtSql module helps you provide seamless database integration to your Qt
+          applications.
+          
+          If you wish to use the SQL module for development, you should install the
+          libqt-devel package.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtSql.so.*"
+
+    - Name: devel-tools
+      Summary: Qt development tools
+      Group: Development/Tools
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains tools used to assist in Qt development, including the Qt
+          Assistant, Linguist, D-Bus Viewer, Pixel Tool and Virtual Framebuffer
+          applications.
+      AutoDepend: no
+      Requires:
+          - libqtsql4-sqlite
+      RequiresPost:
+          - desktop-file-utils
+      RequiresPostUn:
+          - desktop-file-utils
+      Files:
+          - "%{_bindir}/assistant"
+          - "%{_bindir}/lconvert"
+          - "%{_bindir}/linguist"
+          - "%{_bindir}/pixeltool"
+          - "%{_bindir}/qcollectiongenerator"
+          - "%{_bindir}/qdbusviewer"
+          - "%{_bindir}/qdoc3"
+          - "%{_bindir}/qhelpconverter"
+          - "%{_bindir}/qhelpgenerator"
+          - "%{_bindir}/qttracereplay"
+          - "%{_bindir}/xmlpatterns"
+          - "%{_bindir}/xmlpatternsvalidator"
+          - "%{_bindir}/qmlplugindump"
+          - "%{_bindir}/qtconfig"
+          - "%{_datadir}/applications/assistant.desktop"
+          - "%{_datadir}/applications/linguist.desktop"
+          - "%{_datadir}/pixmaps/assistant.png"
+          - "%{_datadir}/pixmaps/linguist.png"
+          - "%{_datadir}/qt4/phrasebooks/"
+          - "%{_datadir}/qt4/translations/assistant_*.qm"
+          - "%{_datadir}/qt4/translations/linguist_*.qm"
+          - "%{_datadir}/qt4/translations/qvfb_*.qm"
+
+    - Name: libqtopengl4
+      AsWholeName: yes
+      Summary: Qt OpenGL module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtOpenGL module offers classes that make it easy to use OpenGL in Qt
+          applications.
+          
+          OpenGL is a standard API for rendering 3D graphics. OpenGL only deals with 3D
+          rendering and provides little or no support for GUI programming issues.
+          
+          The Qt MeeGo graphics system helper provides methods for accessing
+          MeeGo-specific graphics system features and functionalities.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtOpenGL.so.*"
+          - "%{_libdir}/qt4/plugins/graphicssystems/libqglgraphicssystem.so"
+          - "%{_libdir}/libQtMeeGoGraphicsSystemHelper.so.*"
+          - "%{_libdir}/qt4/plugins/graphicssystems/libqmeegographicssystem.so"
+
+    - Name: libqthelp4
+      AsWholeName: yes
+      Summary: Qt help module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtHelp module provides classes for integrating online documentation in
+          applications.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtHelp.so.*"
+          - "%{_datadir}/qt4/translations/qt_help_*.qm"
+
+    - Name: netbook-settings
+      Summary: Qt GUI style settings for Netbook
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains the Netbook specific configuration options and style
+          settings.
+      AutoDepend: no
+      Provides:
+          - "%{name}-netbook = %{version}-%{release}"
+      Obsoletes:
+          - "%{name}-netbook < %{version}-%{release}"
+      BuildArch: noarch
+      Files:
+          - "%config %{_sysconfdir}/xdg/Trolltech-netbook.conf"
+
+    - Name: libqtscripttools4
+      AsWholeName: yes
+      Summary: Qt script tools module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtScriptTools module provides additional components for applications that
+          use Qt Script.
+          
+          This package contains the Qt Script debugger, a tool for debugging script
+          execution in Qt applications that use Qt Script.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtScriptTools.so.*"
+
+    - Name: doc
+      Summary: Qt API documentation
+      Group: Documentation
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains the complete Qt API documentation (new help format).
+          
+          The documentation is provided in the new help format and manpage format;
+          the new help format version can be viewed in conjunction with the Qt Assistant
+          found in the qt-dev-tools package.
+      AutoDepend: no
+      BuildArch: noarch
+      Files:
+          - "%doc %{_docdir}/qt4/qch/"
+          - "%doc %{_docdir}/qt4/src/"
+
+    - Name: libqtxml4
+      AsWholeName: yes
+      Summary: Qt XML module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtXml module provides a stream reader and writer for XML documents,
+          and C++ implementations of SAX and DOM.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtXml.so.*"
+
+    - Name: libqtdeclarative4-folderlistmodel
+      AsWholeName: yes
+      Summary: Qt folderlistmodel QML plugin
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains the folderlistmodel QML plugin for QtDeclarative.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/qt4/imports/Qt/labs/folderlistmodel/libqmlfolderlistmodelplugin.so"
+          - "%{_libdir}/qt4/imports/Qt/labs/folderlistmodel/qmldir"
+
+    - Name: libqtsvg4
+      AsWholeName: yes
+      Summary: Qt SVG module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtSvg module provides classes for displaying the contents of SVG files.
+          
+          Scalable Vector Graphics (SVG) is a language for describing two-dimensional
+          graphics and graphical applications in XML.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtSvg.so.*"
+          - "%{_libdir}/qt4/plugins/iconengines/libqsvgicon.so"
+          - "%{_libdir}/qt4/plugins/imageformats/libqsvg.so"
+
+    - Name: libqtdesigner4
+      AsWholeName: yes
+      Summary: Qt designer module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtDesigner module provides classes that allow you to create your own
+          custom widget plugins for Qt Designer, and classes that enable you to access
+          Qt Designer's components.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtDesigner.so.*"
+          - "%{_libdir}/libQtDesignerComponents.so.*"
+
+    - Name: libqtscript4
+      AsWholeName: yes
+      Summary: Qt script module
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          The QtScript module provides classes for making Qt applications scriptable.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/libQtScript.so.*"
+          - "%{_libdir}/qt4/plugins/script/libqtscriptdbus.so"
+
+    - Name: libqtdeclarative4-gestures
+      AsWholeName: yes
+      Summary: Qt gestures QML plugin
+      Group: Qt/Qt
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains the gestures QML plugin for QtDeclarative.
+      AutoDepend: no
+      Files:
+          - "%{_libdir}/qt4/imports/Qt/labs/gestures/libqmlgesturesplugin.so"
+          - "%{_libdir}/qt4/imports/Qt/labs/gestures/qmldir"
+
+    - Name: libqtopengl-devel
+      AsWholeName: yes
+      Summary: QtOpenGL development files
+      Group: Development/Libraries
+      Description: |
+          Qt is a cross-platform application and UI framework. Using Qt, you can write
+          web-enabled applications once and deploy them across desktop, mobile and
+          embedded operating systems without rewriting the source code.
+          
+          This package contains the development files needed to build Qt applications
+          using QtOpenGL library.
+      AutoDepend: no
+      Requires:
+          - libqt-devel = %{version}-%{release}
+          - libqtopengl4 = %{version}-%{release}
+          - libEGL-devel
+          - libGLESv2-devel
+      Provides:
+          - "%{name}opengl-devel = %{version}-%{release}"
+      Files:
+          - "%{_includedir}/qt4/Qt/QtOpenGL"
+          - "%{_includedir}/qt4/Qt/qgl.h"
+          - "%{_includedir}/qt4/Qt/qglbuffer.h"
+          - "%{_includedir}/qt4/Qt/qglcolormap.h"
+          - "%{_includedir}/qt4/Qt/qglframebufferobject.h"
+          - "%{_includedir}/qt4/Qt/qglfunctions.h"
+          - "%{_includedir}/qt4/Qt/qglpixelbuffer.h"
+          - "%{_includedir}/qt4/Qt/qglscreen_qws.h"
+          - "%{_includedir}/qt4/Qt/qglshaderprogram.h"
+          - "%{_includedir}/qt4/QtOpenGL/"
+          - "%{_libdir}/libQtOpenGL.prl"
+          - "%{_libdir}/libQtOpenGL.so"
+          - "%{_libdir}/pkgconfig/QtOpenGL.pc"
+          - "%{_includedir}/qt4/Qt/QtMeeGoGraphicsSystemHelper"
+          - "%{_includedir}/qt4/Qt/qmeegofencesync.h"
+          - "%{_includedir}/qt4/Qt/qmeegographicssystemhelper.h"
+          - "%{_includedir}/qt4/Qt/qgraphicssystemhelper_symbian.h"
+          - "%{_includedir}/qt4/Qt/qmeegolivepixmap.h"
+          - "%{_includedir}/qt4/Qt/qmeegooverlaywidget.h"
+          - "%{_includedir}/qt4/Qt/qmeegoruntime.h"
+          - "%{_includedir}/qt4/Qt/qmeegoswitchevent.h"
+          - "%{_includedir}/qt4/QtMeeGoGraphicsSystemHelper/"
+          - "%{_libdir}/libQtMeeGoGraphicsSystemHelper.prl"
+          - "%{_libdir}/libQtMeeGoGraphicsSystemHelper.so"
+          - "%{_libdir}/pkgconfig/QtMeeGoGraphicsSystemHelper.pc"
+

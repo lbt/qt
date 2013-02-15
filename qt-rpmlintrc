@@ -1,0 +1,5 @@
+# This line is mandatory to access the configuration functions
+from Config import *
+addFilter("qt-demos.* devel-file-in-non-devel-package")
+addFilter("qt-qmake.* devel-file-in-non-devel-package")
+

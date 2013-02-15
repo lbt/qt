@@ -1,0 +1,8 @@
+[Desktop Entry]
+Categories=Qt;Development;
+Exec=/usr/bin/qtdemo
+Name=Qt 4 examples and demos
+X-KDE-StartupNotify=true
+Icon=qtdemo
+Terminal=false
+Type=Application
